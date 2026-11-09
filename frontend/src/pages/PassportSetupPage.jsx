@@ -82,7 +82,7 @@ export default function PassportSetupPage({ user, catalog, onUser }) {
           </label>
 
           <div className="row2">
-            <label className="field">Programme <small>(optional)</small>
+            <label className="field">Course <small>(from your account)</small>
               <input value={programme} onChange={(e) => setProgramme(e.target.value)} maxLength={80} placeholder="e.g. BSc (Hons) Computer Science (AI)" />
             </label>
             <label className="field">Year <small>(optional)</small>
@@ -132,6 +132,7 @@ export default function PassportSetupPage({ user, catalog, onUser }) {
         <aside className="setup-preview">
           <div className="label">Live preview</div>
           <PassportCover style={style} holder={style.displayName} holderNo="Student #A-····" module={catalog.course.name}
+            university={user.university} studentId={user.studentId}
             programme={programme} year={year} focusLabs={labs.filter((l) => style.focusLabIds.includes(l.id)).map((l) => l.name)}
             stamps={0} endorsed={0} compact />
           <p className="fine">Your passport number is assigned when the passport is issued.</p>

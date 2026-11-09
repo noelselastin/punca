@@ -64,7 +64,7 @@ export default function PassportPage({ catalog, user, onUser, welcome }) {
       )}
       <div className="passport">
         <PassportCover style={p.style} holder={p.holder} holderNo={p.holderNo} module={p.module} programme={p.programme}
-          year={p.year} focusLabs={p.focusLabs} stamps={p.stamps} endorsed={p.endorsed} />
+          university={p.university} studentId={p.studentId} year={p.year} focusLabs={p.focusLabs} stamps={p.stamps} endorsed={p.endorsed} />
         <div className="pp-actions"><button className="btn small" onClick={() => go('setup')}>Customise passport</button></div>
 
         {p.next ? (

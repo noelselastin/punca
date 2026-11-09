@@ -10,6 +10,7 @@ import HistoryPage from './pages/HistoryPage.jsx'
 import LecturerPage from './pages/LecturerPage.jsx'
 import LandingPage from './pages/LandingPage.jsx'
 import PassportSetupPage from './pages/PassportSetupPage.jsx'
+import Brand from './components/Brand.jsx'
 
 function parseHash() {
   const [page = '', id] = window.location.hash.replace(/^#\/?/, '').split('/')
@@ -87,10 +88,7 @@ export default function App() {
   return (
     <div className="shell">
       <header className="topbar">
-        <a className="brand" href="#/home" title="About Punca">
-          <svg viewBox="0 0 64 64" aria-hidden="true"><path d="M32 8c-8 10-16 18-16 28a16 16 0 0 0 32 0c0-10-8-18-16-28z" /><circle cx="32" cy="38" r="5" /></svg>
-          <span>Punca</span>
-        </a>
+        <Brand href="#/home" title="About Punca" />
         <nav>
           {isLecturer
             ? <a className="active" href="#/lecturer">Lecturer dashboard</a>

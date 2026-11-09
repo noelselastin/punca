@@ -1,7 +1,7 @@
 import React from 'react'
 
 export const COVERS = {
-  navy: { label: 'Navy', bg: '#1d3446' },
+  navy: { label: 'Navy', bg: '#17374c' },
   maroon: { label: 'Maroon', bg: '#5a1f2b' },
   forest: { label: 'Forest', bg: '#1f4a35' },
   teal: { label: 'Teal', bg: '#0b4f4c' },
@@ -29,7 +29,7 @@ export function Emblem({ name = 'spring', size = 28 }) {
 }
 
 /** The coloured passport cover used on the passport page and as the live preview while customising. */
-export default function PassportCover({ style = {}, holder, holderNo, module, programme, year, focusLabs = [], stamps, endorsed, compact }) {
+export default function PassportCover({ style = {}, holder, holderNo, university, studentId, module, programme, year, focusLabs = [], stamps, endorsed, compact }) {
   const cover = COVERS[style.cover] || COVERS.navy
   return (
     <div className={`pp-cover ${compact ? 'compact' : ''}`} style={{ background: cover.bg }}>
@@ -43,7 +43,9 @@ export default function PassportCover({ style = {}, holder, holderNo, module, pr
       <div className="pp-holder">
         <div><span>Holder</span><b>{holder || 'Your name'}</b></div>
         <div><span>No.</span><b>{holderNo || 'Student #A-0000'}</b></div>
-        {programme && <div><span>Programme</span><b>{programme}{year ? ` · Year ${year}` : ''}</b></div>}
+        {university && <div><span>University</span><b>{university}</b></div>}
+        {studentId && <div><span>Student ID</span><b>{studentId}</b></div>}
+        {programme && <div><span>Course</span><b>{programme}{year ? ` · Year ${year}` : ''}</b></div>}
         <div><span>Module</span><b>{module}</b></div>
         {focusLabs.length > 0 && <div><span>Trips</span><b>{focusLabs.map((l) => l.split(':')[0]).join(', ')}</b></div>}
         {style.motto && <div className="pp-motto">“{style.motto}”</div>}

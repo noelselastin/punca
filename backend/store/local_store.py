@@ -62,6 +62,21 @@ class LocalStore:
             if save:
                 self.save()
 
+    def create_user(self, user: dict) -> str | None:
+        """Atomically enforce account identifiers within this single-process local store.
+
+        Return the conflicting field, or persist the account and return None.
+        Existing demo/legacy users without a student ID remain valid.
+        """
+        with self._lock:
+            for field in ("email", "studentId"):
+                key = (user.get(field) or "").strip().casefold()
+                if key and any((existing.get(field) or "").strip().casefold() == key
+                               for existing in self.data["users"].values()):
+                    return field
+            self.put("users", user["uid"], user)
+            return None
+
     def list(self, col: str, where: Callable[[dict], bool] | None = None) -> list[dict]:
         with self._lock:
             docs: Iterable[dict] = self.data[col].values()

@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import App from './App.jsx'
 import { installErrorLogging, reportError } from './logging.js'
 import './styles.css'
+import './app-theme.css'
 
 installErrorLogging()
 

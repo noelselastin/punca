@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import Brand from '../components/Brand.jsx'
 import './landing.css'
 
 const SOURCES = {
@@ -193,16 +194,16 @@ export default function LandingPage({ user, onStart, onSignIn }) {
   return <div className="pn-landing">
     <a className="pn-skip" href="#pn-main" onClick={e => { e.preventDefault(); jumpTo('pn-main') }}>Skip to content</a>
     <header className="pn-nav">
-      <a className="pn-brand" href="#/" aria-label="Punca home"><span className="pn-brand-icon">p<span>↗</span></span>punca<span className="pn-brand-dot">.</span></a>
+      <Brand />
       <nav aria-label="Page sections"><button onClick={() => jumpTo('pn-why')}>Why Punca</button><button onClick={() => jumpTo('pn-journey')}>The journey</button><button onClick={() => jumpTo('pn-faq')}>Questions</button></nav>
       <div className="pn-nav-actions">{!user && <button className="pn-text-button" onClick={onSignIn}>Sign in</button>}<button className="pn-button pn-button-small" onClick={onStart}>{startLabel}<Arrow diagonal /></button></div>
     </header>
 
     <main id="pn-main" tabIndex={-1}>
       <section className="pn-hero pn-container">
-        <div className="pn-hero-copy"><p className="pn-eyebrow"><span /> FOR THE MOMENT IT STOPS MAKING SENSE</p>
-          <h1>Three hours in.<br />Still on the<br /><em>same slide?</em></h1>
-          <p className="pn-hero-lead">The missing piece might be a topic from last semester. Find it, work through it, and get moving again.</p>
+        <div className="pn-hero-copy"><p className="pn-eyebrow pn-hero-eyebrow"><span />Identify knowledge gaps. Strengthen your foundations.</p>
+          <h1>Learn with<br /><em>confidence.</em></h1>
+          <p className="pn-hero-lead">For the concepts that never quite clicked.<br />Learn, Without the blind spots<br />Identify knowledge gaps. Strengthen your foundations. Learn with confidence.</p>
           <div className="pn-hero-actions"><button className="pn-button" onClick={onStart}>{startLabel}<Arrow diagonal /></button><button className="pn-link-button" onClick={() => jumpTo('pn-journey')}>See the journey <span aria-hidden="true">↓</span></button></div>
           <p className="pn-hero-foot">Up to 5 questions to find a starting point.<br /><span>Free prototype · Made for APU students</span></p>
         </div>

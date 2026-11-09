@@ -1,4 +1,9 @@
+from concurrent.futures import ThreadPoolExecutor
+
+import pytest
+
 from store.seed import DEMO_LECTURER_EMAIL, DEMO_PASSWORD, DEMO_STUDENT_EMAIL
+from store.local_store import LocalStore
 
 from conftest import answer_as
 
@@ -8,20 +13,62 @@ def auth(token):
 
 
 def signup(client, email="new.student@example.edu", **extra):
-    body = {"name": "New Student", "email": email, "password": "correct-horse-1", **extra}
+    body = {"name": "New Student", "email": email, "password": "correct-horse-1",
+            "confirmPassword": "correct-horse-1", "university": "Example University",
+            "studentId": email.split("@")[0], "programme": "BSc Computer Science", **extra}
     return client.post("/api/auth/signup", json=body)
 
 
 # ---- accounts ----------------------------------------------------------------------------------
 def test_student_signup_login_and_me(client):
-    r = signup(client, programme="BSc CS", year=2)
+    r = signup(client, programme=" BSc CS ", year=2, university=" Example University ", studentId=" tp12345 ")
     assert r.status_code == 200, r.text
     assert r.json()["user"]["role"] == "student"
     assert "passwordHash" not in r.json()["user"]
+    assert "confirmPassword" not in r.json()["user"]
     r = client.post("/api/auth/login", json={"email": "NEW.student@example.edu", "password": "correct-horse-1"})
     assert r.status_code == 200
     me = client.get("/api/me", headers=auth(r.json()["token"]))
     assert me.json()["name"] == "New Student" and me.json()["year"] == 2
+    assert me.json()["university"] == "Example University"
+    assert me.json()["studentId"] == "TP12345"
+    assert me.json()["programme"] == "BSc CS"
+    passport = client.get("/api/me/passport", headers=auth(r.json()["token"])).json()
+    assert passport["studentId"] == "TP12345" and passport["university"] == "Example University"
+    stored = LocalStore(client.svc.store.path).get("users", me.json()["uid"])
+    assert stored["studentId"] == "TP12345"
+    assert not {"password", "confirmPassword"} & stored.keys()
+
+
+@pytest.mark.parametrize("field,value", [
+    ("university", " "), ("university", "U" * 121), ("studentId", ""),
+    ("studentId", "TP 123"), ("studentId", "T" * 41), ("programme", " "),
+    ("programme", "C" * 81), ("confirmPassword", "different-password"),
+    ("confirmPassword", ""),
+])
+def test_signup_requires_valid_student_details(client, field, value):
+    before = len(client.svc.store.list("users"))
+    response = signup(client, **{field: value})
+    assert response.status_code == 400, response.text
+    assert len(client.svc.store.list("users")) == before
+
+
+def test_student_id_uniqueness_is_case_insensitive(client):
+    assert signup(client, studentId="TP001").status_code == 200
+    duplicate = signup(client, email="another@example.edu", studentId=" tp001 ")
+    assert duplicate.status_code == 409
+    assert "student ID" in duplicate.json()["error"]
+    # Both identifiers must be unique; a different ID does not bypass the email check.
+    assert signup(client, studentId="TP002").status_code == 409
+
+
+def test_simultaneous_signups_cannot_reuse_a_student_id(client):
+    def create(index):
+        return signup(client, email=f"parallel{index}@example.edu", studentId="TP-CONCURRENT").status_code
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        statuses = list(pool.map(create, [1, 2]))
+    assert sorted(statuses) == [200, 409]
+    assert len(client.svc.store.list("users", lambda u: u.get("studentId") == "TP-CONCURRENT")) == 1
 
 
 def test_signup_cannot_create_a_lecturer(client):

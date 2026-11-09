@@ -31,6 +31,9 @@ class SignupBody(BaseModel):
     name: str
     email: str
     password: str
+    confirmPassword: str = ""
+    university: str = ""
+    studentId: str = ""
     programme: str | None = None
     year: int | str | None = None
 

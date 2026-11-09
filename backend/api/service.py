@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import uuid
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
@@ -67,7 +68,7 @@ class PuncaService:
     # ================================================================== accounts ============
     @staticmethod
     def public_user(u: dict) -> dict:
-        return {k: u.get(k) for k in ("uid", "role", "name", "email", "programme", "year", "department",
+        return {k: u.get(k) for k in ("uid", "role", "name", "email", "university", "studentId", "programme", "year", "department",
                                       "availability", "consent", "createdAt", "passportStyle")} | {
             "demoAccount": u.get("demoAccount", False)}
 
@@ -88,15 +89,24 @@ class PuncaService:
         name = (data.get("name") or "").strip()
         email = (data.get("email") or "").strip().lower()
         password = data.get("password") or ""
+        university = (data.get("university") or "").strip()
+        student_id = (data.get("studentId") or "").strip().upper()
+        course = (data.get("programme") or "").strip()
         if not 2 <= len(name) <= 60:
             raise ServiceError(400, "Enter your name (2 to 60 characters).")
         if not auth.valid_email(email):
-            raise ServiceError(400, "Enter a valid email address.")
+            raise ServiceError(400, "Enter a valid university email address.")
         if len(password) < 8 or len(password) > 128:
             raise ServiceError(400, "Use a password of at least 8 characters.")
-        if self._user_by_email(email):
-            raise ServiceError(409, "An account with that email already exists. Sign in instead.")
-        extra: dict = {"programme": (data.get("programme") or "").strip()[:80] or None}
+        if password != data.get("confirmPassword"):
+            raise ServiceError(400, "Passwords do not match.")
+        if not 2 <= len(university) <= 120:
+            raise ServiceError(400, "Enter your university (2 to 120 characters).")
+        if not re.fullmatch(r"[A-Z0-9][A-Z0-9._/-]{0,39}", student_id):
+            raise ServiceError(400, "Enter a student ID of up to 40 letters or numbers. Dots, hyphens, underscores and slashes are allowed.")
+        if not 2 <= len(course) <= 80:
+            raise ServiceError(400, "Enter your course (2 to 80 characters).")
+        extra: dict = {"programme": course, "university": university, "studentId": student_id}
         year = data.get("year")
         if year not in (None, ""):
             try:
@@ -114,7 +124,11 @@ class PuncaService:
                             "sharePassport": False},
                 "synthetic": False, "createdAt": _iso()}
         user.update(extra)
-        self.store.put("users", uid, user)
+        conflict = self.store.create_user(user)
+        if conflict == "email":
+            raise ServiceError(409, "An account with that email already exists. Sign in instead.")
+        if conflict == "studentId":
+            raise ServiceError(409, "That student ID is already registered. Sign in to your existing account.")
         log.info("account created uid=%s role=%s", uid, role)
         return {"token": self._issue_token(uid), "user": self.public_user(user)}
 
@@ -446,7 +460,8 @@ class PuncaService:
         lab_names = {lab["id"]: lab["name"] for lab in self.cat.labs}
         return {"holder": style.get("displayName") or user["name"], "holderNo": f"Student #A-{holder_no:04d}",
                 "style": style, "focusLabs": [lab_names[x] for x in style.get("focusLabIds", []) if x in lab_names],
-                "programme": user.get("programme"), "year": user.get("year"), "module": self.cat.course["name"],
+                "programme": user.get("programme"), "university": user.get("university"),
+                "studentId": user.get("studentId"), "year": user.get("year"), "module": self.cat.course["name"],
                 "regions": [{"name": r, "concepts": regions[r]} for r in order if r in regions],
                 "stamps": len(stamps), "endorsed": sum(1 for s in stamps.values() if s["tier"] == "endorsed"),
                 "next": nxt, "shared": bool(user["consent"].get("sharePassport"))}
