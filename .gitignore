@@ -147,3 +147,15 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+
+# Punca local runtime data (demo store); seed data lives in data/
+backend/var/
+
+# Local tooling
+.claude/

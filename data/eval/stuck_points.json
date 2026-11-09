@@ -1,0 +1,30 @@
+{
+  "note": "Evaluation stuck-points. Each item simulates a student who is missing exactly one concept ('gap'): they answer probes on the gap, and on every concept that depends on it, wrongly, and answer everything else correctly. The runner checks (1) whether the stuck text maps to expectedTarget and (2) whether the engine names the gap as the root cause. These are synthetic students, not real data.",
+  "items": [
+    {"id": "e01", "stuckInput": "I don't get how backprop computes the gradients for the hidden layer weights", "expectedTarget": "backpropagation", "gap": "chain-rule"},
+    {"id": "e02", "stuckInput": "My matmul keeps throwing a shape mismatch error, the dimensions don't match", "expectedTarget": "matrix-multiplication", "gap": "matrix-multiplication"},
+    {"id": "e03", "stuckInput": "Lab 2: why do we use log loss / cross entropy instead of MSE?", "expectedTarget": "cross-entropy", "gap": "logarithms"},
+    {"id": "e04", "stuckInput": "The gradient descent update rule makes no sense to me, why minus the gradient and what does the learning rate do", "expectedTarget": "gradient-descent", "gap": "partial-derivatives"},
+    {"id": "e05", "stuckInput": "Bayes theorem question in lab 4, how do I get the posterior from the prior and likelihood", "expectedTarget": "bayes-theorem", "gap": "conditional-probability"},
+    {"id": "e06", "stuckInput": "How does softmax turn logits into class probabilities?", "expectedTarget": "softmax", "gap": "exponents"},
+    {"id": "e07", "stuckInput": "How do I compute a neuron's output from the weights, bias and weighted sum?", "expectedTarget": "artificial-neuron", "gap": "dot-product"},
+    {"id": "e08", "stuckInput": "Why does the sigmoid squash everything between 0 and 1?", "expectedTarget": "sigmoid", "gap": "exponents"},
+    {"id": "e09", "stuckInput": "Why is the derivative of e^(2x) equal to 2e^(2x)? The chain rule confuses me", "expectedTarget": "chain-rule", "gap": "function-composition"},
+    {"id": "e10", "stuckInput": "Linear regression line of best fit, I can't work out the slope and intercept", "expectedTarget": "linear-regression", "gap": "linear-functions"},
+    {"id": "e11", "stuckInput": "How do I calculate the mean squared error loss in lab 1?", "expectedTarget": "loss-functions", "gap": "mean-variance"},
+    {"id": "e12", "stuckInput": "What is the expected value of a random variable and how do I compute E[X]?", "expectedTarget": "expected-value", "gap": "summation"},
+    {"id": "e13", "stuckInput": "Partial derivative with respect to x when the function also has y in it", "expectedTarget": "partial-derivatives", "gap": "derivative-rules"},
+    {"id": "e14", "stuckInput": "Why does overfitting happen? My validation loss goes up while training loss goes down", "expectedTarget": "overfitting", "gap": "loss-functions"},
+    {"id": "e15", "stuckInput": "Using the power rule to differentiate polynomials", "expectedTarget": "derivative-rules", "gap": "exponents"},
+    {"id": "e16", "stuckInput": "How do I take the dot product of two vectors?", "expectedTarget": "dot-product", "gap": "summation"},
+    {"id": "e17", "stuckInput": "What is the difference between ReLU and tanh activation functions?", "expectedTarget": "activation-functions", "gap": "activation-functions"},
+    {"id": "e18", "stuckInput": "Conditional probability, what does P(A|B) given B mean?", "expectedTarget": "conditional-probability", "gap": "probability"},
+    {"id": "e19", "stuckInput": "Backpropagation through the layers of a neural network, I'm completely lost", "expectedTarget": "backpropagation", "gap": "matrix-multiplication"},
+    {"id": "e20", "stuckInput": "Why is the derivative of ln x equal to 1/x?", "expectedTarget": "exp-log-derivatives", "gap": "logarithms"},
+    {"id": "e21", "stuckInput": "How do I transpose a matrix and what happens to the shape?", "expectedTarget": "transpose", "gap": "matrices"},
+    {"id": "e22", "stuckInput": "Limits: what value does the function approach as x tends to 1?", "expectedTarget": "limits", "gap": "functions"},
+    {"id": "e23", "stuckInput": "The gradient vector points in the direction of steepest ascent, why?", "expectedTarget": "gradient-vector", "gap": "vectors"},
+    {"id": "e24", "stuckInput": "Logistic regression classifier: how does the threshold turn a probability into a class?", "expectedTarget": "logistic-regression", "gap": "sigmoid"},
+    {"id": "e25", "stuckInput": "Chain rule in backprop for deep networks, gradients of the weights", "expectedTarget": "backpropagation", "gap": "derivative-rules"}
+  ]
+}
