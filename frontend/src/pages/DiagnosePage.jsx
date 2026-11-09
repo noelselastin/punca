@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { api } from '../api.js'
 import { ErrorNote, go } from '../components/common.jsx'
 import ProbeCard from '../components/ProbeCard.jsx'
@@ -10,9 +10,10 @@ const EXAMPLES = [
   'How do I get the posterior with Bayes theorem in lab 4?',
 ]
 
-export default function DiagnosePage() {
+export default function DiagnosePage({ prefill, onClearPrefill }) {
   const [stage, setStage] = useState('input')
-  const [text, setText] = useState('')
+  const [text, setText] = useState(prefill ? prefill.stuckInput || '' : '')
+  const [moodleSource, setMoodleSource] = useState(prefill ? prefill.sourceTitle || null : null)
   const [mapping, setMapping] = useState(null)
   const [target, setTarget] = useState(null)
   const [diag, setDiag] = useState(null)
@@ -21,6 +22,15 @@ export default function DiagnosePage() {
   const [feedback, setFeedback] = useState(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
+
+  useEffect(() => {
+    if (prefill && prefill.stuckInput) {
+      setText(prefill.stuckInput)
+      setMoodleSource(prefill.sourceTitle || 'APU Moodle')
+      setStage('input')
+      if (onClearPrefill) onClearPrefill()
+    }
+  }, [prefill, onClearPrefill])
 
   const run = async (fn) => {
     setBusy(true)
@@ -93,6 +103,12 @@ export default function DiagnosePage() {
         <span className={stage === 'input' ? 'cur' : 'done'}>1 Describe</span><span className={stage === 'mapped' ? 'cur' : ''}>2 Map</span><span>3 Quick checks</span><span>4 Your gap</span>
       </div>
       <form className="card" onSubmit={findGap}>
+        {moodleSource && (
+          <div className="banner moodle-prefill-banner">
+            <span>Loaded from APU Moodle: <b>{moodleSource}</b></span>
+            <button type="button" className="btn ghost small" onClick={() => setMoodleSource(null)}>Dismiss</button>
+          </div>
+        )}
         <h1 className="h1">Where are you stuck?</h1>
         <p className="muted">Paste a lab question, an assignment brief or a slide, or just describe it in your own words.</p>
         <textarea value={text} onChange={(e) => { setText(e.target.value); if (stage !== 'input') setStage('input') }} rows={4} maxLength={2000}
@@ -101,7 +117,12 @@ export default function DiagnosePage() {
           {EXAMPLES.map((ex) => <button type="button" key={ex} className="chip-btn" onClick={() => { setText(ex); setStage('input') }}>{ex}</button>)}
         </div>
         <ErrorNote error={stage === 'input' ? error : null} />
-        {stage === 'input' && <div className="actions"><button className="btn primary" disabled={busy || text.trim().length < 3}>{busy ? 'Mapping...' : 'Find my gap'}</button></div>}
+        {stage === 'input' && (
+          <div className="actions">
+            <button className="btn primary" disabled={busy || text.trim().length < 3}>{busy ? 'Mapping...' : 'Find my gap'}</button>
+            <button type="button" className="btn ghost" onClick={() => go('moodle')}>Pick from APU Moodle slides & deadlines</button>
+          </div>
+        )}
       </form>
 
       {stage === 'mapped' && mapping && (

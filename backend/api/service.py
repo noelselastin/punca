@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 
 import auth
 import config
+import moodle
 from content import Catalog
 from diagnosis import bkt
 from diagnosis.engine import DiagnosisEngine, DiagnosisError, Params
@@ -68,9 +69,14 @@ class PuncaService:
     # ================================================================== accounts ============
     @staticmethod
     def public_user(u: dict) -> dict:
+        mc = u.get("moodleConnection") or {}
         return {k: u.get(k) for k in ("uid", "role", "name", "email", "university", "studentId", "programme", "year", "department",
                                       "availability", "consent", "createdAt", "passportStyle")} | {
-            "demoAccount": u.get("demoAccount", False)}
+            "demoAccount": u.get("demoAccount", False),
+            "moodleConnected": bool(mc.get("syncedAt")),
+            "moodleSite": mc.get("siteName"),
+            "moodleMode": mc.get("mode"),
+        }
 
     def _user_by_email(self, email: str) -> dict | None:
         email = email.strip().lower()
@@ -458,13 +464,23 @@ class PuncaService:
         style.setdefault("cover", PASSPORT_COVERS[0])
         style.setdefault("emblem", PASSPORT_EMBLEMS[0])
         lab_names = {lab["id"]: lab["name"] for lab in self.cat.labs}
+        mc = user.get("moodleConnection") or {}
+        moodle_summary = {
+            "connected": bool(mc.get("syncedAt")),
+            "siteName": mc.get("siteName") or "APU Moodle",
+            "mode": mc.get("mode"),
+            "courseCount": len(mc.get("courses") or []),
+            "materialCount": len(mc.get("materials") or []) + len(mc.get("importedMaterials") or []),
+            "deadlineCount": len(mc.get("deadlines") or []),
+            "syncedAt": mc.get("syncedAt"),
+        }
         return {"holder": style.get("displayName") or user["name"], "holderNo": f"Student #A-{holder_no:04d}",
                 "style": style, "focusLabs": [lab_names[x] for x in style.get("focusLabIds", []) if x in lab_names],
                 "programme": user.get("programme"), "university": user.get("university"),
                 "studentId": user.get("studentId"), "year": user.get("year"), "module": self.cat.course["name"],
                 "regions": [{"name": r, "concepts": regions[r]} for r in order if r in regions],
                 "stamps": len(stamps), "endorsed": sum(1 for s in stamps.values() if s["tier"] == "endorsed"),
-                "next": nxt, "shared": bool(user["consent"].get("sharePassport"))}
+                "next": nxt, "shared": bool(user["consent"].get("sharePassport")), "moodle": moodle_summary}
 
     # ================================================================== circles =============
     def _latest_root(self, uid: str) -> str | None:
@@ -722,6 +738,186 @@ class PuncaService:
                  note="The lecturer could not take this slot, so the circle meets as a peer session.")
         self.store.put("studyCircles", circle_id, c)
         return self.circle_view(c, user)
+
+    # ================================================================== moodle ==============
+    def _concept_passport_state(self, cid: str, mastery: dict, stamps: dict) -> str:
+        st = stamps.get(cid)
+        if st:
+            return "endorsed" if st["tier"] == "endorsed" else "stamped"
+        m = mastery.get(cid)
+        if m and m["status"] == "gap":
+            return "entry-required"
+        if m and m["status"] in ("shaky", "solid"):
+            return m["status"]
+        return "untested"
+
+    def _annotate_moodle_items(self, uid: str, items: list[dict]) -> list[dict]:
+        mastery = self.mastery_map(uid)
+        stamps = {s["conceptId"]: s for s in self.store.list("stamps", lambda s: s["uid"] == uid)}
+        annotated: list[dict] = []
+        for item in items:
+            query_text = f"{item.get('title', '')} {item.get('summary', '')} {' '.join(item.get('files') or [])}"
+            hits = self.cat.search_concepts(query_text, k=3)
+            concepts = []
+            for h in hits:
+                cid = h["conceptId"]
+                c_obj = self.cat.concepts.get(cid) or {}
+                prereqs = [
+                    {
+                        "id": pid,
+                        "name": self.cat.name(pid),
+                        "state": self._concept_passport_state(pid, mastery, stamps),
+                    }
+                    for pid in (c_obj.get("prerequisites") or [])[:3]
+                ]
+                concepts.append({
+                    "conceptId": cid,
+                    "name": h["name"],
+                    "state": self._concept_passport_state(cid, mastery, stamps),
+                    "prerequisites": prereqs,
+                })
+            primary = concepts[0]["conceptId"] if concepts else None
+            course_prefix = f"{item.get('courseName')}: " if item.get("courseName") else ""
+            prompt_body = item.get("fullText") or item.get("summary") or item.get("title") or ""
+            stuck_prompt = f"{course_prefix}{item.get('title', '')} — {prompt_body}"[:1800]
+            ready_count = sum(1 for c in concepts if c["state"] in ("stamped", "endorsed", "solid"))
+            annotated.append(dict(
+                item,
+                concepts=concepts,
+                primaryConceptId=primary,
+                primaryConceptName=self.cat.name(primary),
+                stuckPrompt=stuck_prompt,
+                readiness=f"{ready_count}/{len(concepts)} foundations verified" if concepts else "Ready to map",
+            ))
+        return annotated
+
+    def moodle_check(self, base_url: str | None = None) -> dict:
+        try:
+            return moodle.check_public_config(base_url)
+        except moodle.MoodleError as exc:
+            raise ServiceError(exc.status, exc.message) from exc
+
+    def moodle_status(self, user: dict) -> dict:
+        mc = dict(user.get("moodleConnection") or {})
+        base_url = mc.get("baseUrl") or moodle.DEFAULT_MOODLE_URL
+        pub = mc.get("publicConfig")
+        if not pub:
+            try:
+                pub = moodle.check_public_config(base_url, timeout=3.5)
+            except moodle.MoodleError:
+                pub = moodle.check_public_config(moodle.DEFAULT_MOODLE_URL, timeout=3.5)
+        connected = bool(mc.get("syncedAt"))
+        imported = list(mc.get("importedMaterials") or [])
+        synced_materials = list(mc.get("materials") or [])
+        all_materials = self._annotate_moodle_items(user["uid"], imported + synced_materials)
+        deadlines = self._annotate_moodle_items(user["uid"], list(mc.get("deadlines") or []))
+        conn_view = None
+        if connected:
+            conn_view = {
+                "mode": mc.get("mode"),
+                "baseUrl": mc.get("baseUrl"),
+                "siteName": mc.get("siteName"),
+                "accountName": mc.get("accountName"),
+                "username": mc.get("username"),
+                "tokenMasked": mc.get("tokenMasked"),
+                "syncedAt": mc.get("syncedAt"),
+            }
+        return {
+            "connected": connected,
+            "defaultUrl": moodle.DEFAULT_MOODLE_URL,
+            "publicConfig": pub,
+            "connection": conn_view,
+            "courses": list(mc.get("courses") or []),
+            "materials": all_materials,
+            "deadlines": deadlines,
+        }
+
+    def moodle_connect(self, user: dict, data: dict) -> dict:
+        mode = (data.get("mode") or "token").strip().lower()
+        base_url = data.get("baseUrl") or moodle.DEFAULT_MOODLE_URL
+        prev_imported = list((user.get("moodleConnection") or {}).get("importedMaterials") or [])
+        try:
+            pub = moodle.check_public_config(base_url, timeout=5.0)
+            if mode == "apu-demo":
+                snap = moodle.build_apu_sample_snapshot(user, base_url)
+            elif mode == "token":
+                token = (data.get("token") or "").strip()
+                snap = moodle.sync_with_token(base_url, token)
+                snap["token"] = token
+            else:
+                raise ServiceError(400, "Pick either 'token' (Moodle Security Key) or 'apu-demo'.")
+        except moodle.MoodleError as exc:
+            raise ServiceError(exc.status, exc.message) from exc
+
+        snap["publicConfig"] = pub
+        snap["importedMaterials"] = prev_imported
+        user["moodleConnection"] = snap
+        self.store.put("users", user["uid"], user)
+        log.info("uid=%s connected moodle mode=%s site=%s", user["uid"], mode, snap.get("siteName"))
+        return self.moodle_status(user)
+
+    def moodle_sync(self, user: dict) -> dict:
+        mc = dict(user.get("moodleConnection") or {})
+        if not mc.get("syncedAt"):
+            raise ServiceError(409, "Connect your Moodle account first.")
+        mode = mc.get("mode") or "apu-demo"
+        base_url = mc.get("baseUrl") or moodle.DEFAULT_MOODLE_URL
+        prev_imported = list(mc.get("importedMaterials") or [])
+        try:
+            pub = moodle.check_public_config(base_url, timeout=5.0)
+            if mode == "token" and mc.get("token"):
+                snap = moodle.sync_with_token(base_url, mc["token"])
+                snap["token"] = mc["token"]
+            else:
+                snap = moodle.build_apu_sample_snapshot(user, base_url)
+        except moodle.MoodleError as exc:
+            raise ServiceError(exc.status, exc.message) from exc
+        snap["publicConfig"] = pub
+        snap["importedMaterials"] = prev_imported
+        user["moodleConnection"] = snap
+        self.store.put("users", user["uid"], user)
+        return self.moodle_status(user)
+
+    def moodle_disconnect(self, user: dict) -> dict:
+        user.pop("moodleConnection", None)
+        self.store.put("users", user["uid"], user)
+        log.info("uid=%s disconnected moodle", user["uid"])
+        return self.moodle_status(user)
+
+    def moodle_import(self, user: dict, data: dict) -> dict:
+        try:
+            parsed = moodle.parse_imported_material(
+                title=data.get("title"),
+                course_name=data.get("courseName"),
+                filename=data.get("filename"),
+                content_base64=data.get("contentBase64"),
+                text=data.get("text"),
+            )
+        except moodle.MoodleError as exc:
+            raise ServiceError(exc.status, exc.message) from exc
+
+        mc = dict(user.get("moodleConnection") or {})
+        if not mc.get("syncedAt"):
+            mc = moodle.build_apu_sample_snapshot(user, moodle.DEFAULT_MOODLE_URL)
+        imported = list(mc.get("importedMaterials") or [])
+        item = {
+            "id": "moodle-import-" + uuid.uuid4().hex[:8],
+            "courseId": "imported",
+            "courseName": parsed["courseName"],
+            "section": "Uploaded Moodle Material",
+            "kind": "imported",
+            "title": parsed["title"],
+            "files": [parsed["filename"]] if parsed.get("filename") else [],
+            "summary": parsed["summary"],
+            "fullText": parsed["fullText"],
+            "importedAt": _iso(),
+        }
+        imported.insert(0, item)
+        mc["importedMaterials"] = imported[:20]
+        user["moodleConnection"] = mc
+        self.store.put("users", user["uid"], user)
+        annotated = self._annotate_moodle_items(user["uid"], [item])[0]
+        return {"imported": annotated, "status": self.moodle_status(user)}
 
 
 def _label(tag: str | None) -> str | None:

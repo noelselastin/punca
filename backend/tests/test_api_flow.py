@@ -178,3 +178,67 @@ def test_students_cannot_read_each_others_diagnoses(client):
     b = signup(client, email="b@example.edu").json()["token"]
     d = client.post("/api/diagnoses", json={"stuckInput": "softmax help", "targetConceptId": "softmax"}, headers=auth(a)).json()
     assert client.get(f"/api/diagnoses/{d['id']}", headers=auth(b)).status_code == 404
+
+
+def test_moodle_connect_sync_import_and_disconnect(client):
+    import base64
+    import io
+    import zipfile
+
+    tok = signup(client, email="moodle.student@mail.apu.edu.my", studentId="TP088123").json()["token"]
+    st0 = client.get("/api/moodle/status", headers=auth(tok))
+    assert st0.status_code == 200 and st0.json()["connected"] is False
+
+    # Connect APU Moodle feed
+    conn = client.post("/api/moodle/connect", json={"mode": "apu-demo", "baseUrl": "https://lms2.apiit.edu.my"}, headers=auth(tok))
+    assert conn.status_code == 200
+    body = conn.json()
+    assert body["connected"] is True
+    assert len(body["courses"]) >= 3
+    assert len(body["materials"]) >= 4
+    assert len(body["deadlines"]) >= 3
+    assert body["materials"][0]["concepts"] and body["materials"][0]["primaryConceptId"]
+
+    # Passport reflects Moodle connection
+    pp = client.get("/api/me/passport", headers=auth(tok)).json()
+    assert pp["moodle"]["connected"] is True and pp["moodle"]["courseCount"] >= 3
+
+    # Upload a real .pptx slide deck
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr(
+            "ppt/slides/slide1.xml",
+            '<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" '
+            'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">'
+            "<a:t>Backpropagation and chain rule gradients in hidden layer weights</a:t></p:sld>",
+        )
+    b64_pptx = base64.b64encode(buf.getvalue()).decode("ascii")
+    imp = client.post(
+        "/api/moodle/import",
+        json={
+            "title": "Uploaded Week 7 Deck",
+            "courseName": "Machine Learning & Neural Networks",
+            "filename": "Week7_Backprop.pptx",
+            "contentBase64": b64_pptx,
+        },
+        headers=auth(tok),
+    )
+    assert imp.status_code == 200
+    imp_data = imp.json()["imported"]
+    assert "Slide 1: Backpropagation" in imp_data["summary"]
+    assert imp_data["primaryConceptId"] is not None
+
+    # Refresh sync preserves imported material
+    refreshed = client.post("/api/moodle/sync", headers=auth(tok))
+    assert refreshed.status_code == 200
+    assert any(m["title"] == "Uploaded Week 7 Deck" for m in refreshed.json()["materials"])
+
+    # Reject private/loopback SSRF URLs and short tokens
+    bad_url = client.post("/api/moodle/check", json={"baseUrl": "http://127.0.0.1:8080"}, headers=auth(tok))
+    assert bad_url.status_code == 400
+    bad_tok = client.post("/api/moodle/connect", json={"mode": "token", "token": "short"}, headers=auth(tok))
+    assert bad_tok.status_code == 400
+
+    # Disconnect
+    disc = client.delete("/api/moodle/connection", headers=auth(tok))
+    assert disc.status_code == 200 and disc.json()["connected"] is False

@@ -145,6 +145,39 @@ input[aria-invalid='true'] { border-color: var(--gap); }
 .practice { grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
 .pn-landing .pn-hero .pn-hero-eyebrow { font-size: 11px; font-weight: 600; letter-spacing: .025em; text-transform: none; max-width: 480px; }
 .pn-hero-eyebrow > span { flex-shrink: 0; }
+.moodle-page { display: grid; gap: 28px; }
+.moodle-hero { border-top: 3px solid var(--gold-accent); display: grid; gap: 20px; }
+.moodle-hero-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; flex-wrap: wrap; }
+.moodle-hero-top .muted { max-width: 680px; margin-bottom: 0; }
+.moodle-badges { display: flex; flex-wrap: wrap; gap: 8px; }
+.moodle-connect-panel { display: grid; gap: 14px; padding-top: 8px; border-top: 1px solid var(--line); }
+.moodle-connect-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.moodle-token-form { display: grid; gap: 16px; background: var(--paper); border: 1px solid var(--line); border-radius: 3px; padding: 18px; margin-top: 6px; }
+.moodle-connected-bar { display: grid; gap: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+.moodle-conn-meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
+.moodle-conn-meta b { display: block; font-size: 14px; margin-top: 3px; }
+.moodle-conn-buttons { display: flex; flex-wrap: wrap; gap: 10px; }
+.moodle-section-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+.moodle-columns { align-items: start; }
+.moodle-col { display: grid; gap: 16px; }
+.moodle-list { display: grid; gap: 14px; }
+.moodle-item { background: var(--paper); border: 1px solid var(--line); border-radius: 3px; padding: 18px; display: grid; gap: 10px; }
+.moodle-item .h3 { margin: 0; line-height: 1.35; }
+.moodle-item .muted { margin: 0; font-size: 13px; line-height: 1.55; }
+.moodle-item-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 11px; }
+.moodle-course-tag { font-weight: 700; color: var(--primary); }
+.moodle-due { background: var(--shaky-soft); color: var(--shaky); padding: 3px 8px; border-radius: 3px; font-weight: 600; }
+.moodle-section-tag { color: var(--muted); }
+.moodle-files { display: flex; flex-wrap: wrap; gap: 6px; }
+.moodle-file-badge { background: var(--surface); border: 1px solid var(--line); border-radius: 3px; padding: 3px 7px; font-size: 11px; }
+.moodle-concepts { display: grid; gap: 7px; padding-top: 6px; border-top: 1px dashed var(--line); }
+.moodle-chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.moodle-concept-pill { display: inline-flex; align-items: center; gap: 6px; background: var(--surface); border: 1px solid var(--line); border-radius: 3px; padding: 4px 8px; font-size: 12px; }
+.moodle-item-actions { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 4px; }
+.moodle-import-card { display: grid; gap: 14px; }
+.moodle-import-form { display: grid; gap: 14px; margin-top: 4px; }
+.moodle-prefill-banner { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px; }
+.pp-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 @media (max-width: 1100px) {
   .topbar { gap: 24px; padding: 17px 24px; }
   .topbar nav { gap: 13px; }

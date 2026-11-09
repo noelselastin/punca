@@ -86,6 +86,24 @@ class ClientLogBody(BaseModel):
     url: str | None = None
 
 
+class MoodleCheckBody(BaseModel):
+    baseUrl: str | None = None
+
+
+class MoodleConnectBody(BaseModel):
+    mode: str = "token"
+    baseUrl: str | None = None
+    token: str | None = None
+
+
+class MoodleImportBody(BaseModel):
+    title: str | None = None
+    courseName: str | None = None
+    filename: str | None = None
+    contentBase64: str | None = None
+    text: str | None = None
+
+
 def create_app(store_path: Path | None = None, offline: bool | None = None) -> FastAPI:
     catalog = Catalog()
     store = LocalStore(store_path or config.STORE_PATH)
@@ -228,6 +246,31 @@ def create_app(store_path: Path | None = None, offline: bool | None = None) -> F
     @app.post("/api/circles/{circle_id}/done")
     def circle_done(circle_id: str, user: dict = Depends(student)):
         return svc.circle_done(user, circle_id)
+
+    # ---- student: moodle ---------------------------------------------------------------------
+    @app.get("/api/moodle/status")
+    def moodle_status(user: dict = Depends(student)):
+        return svc.moodle_status(user)
+
+    @app.post("/api/moodle/check")
+    def moodle_check(body: MoodleCheckBody, user: dict = Depends(student)):
+        return svc.moodle_check(body.baseUrl)
+
+    @app.post("/api/moodle/connect")
+    def moodle_connect(body: MoodleConnectBody, user: dict = Depends(student)):
+        return svc.moodle_connect(user, body.model_dump())
+
+    @app.post("/api/moodle/sync")
+    def moodle_sync(user: dict = Depends(student)):
+        return svc.moodle_sync(user)
+
+    @app.delete("/api/moodle/connection")
+    def moodle_disconnect(user: dict = Depends(student)):
+        return svc.moodle_disconnect(user)
+
+    @app.post("/api/moodle/import")
+    def moodle_import(body: MoodleImportBody, user: dict = Depends(student)):
+        return svc.moodle_import(user, body.model_dump())
 
     # ---- lecturer ----------------------------------------------------------------------------
     @app.get("/api/lecturer/overview")

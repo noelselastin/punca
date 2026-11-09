@@ -10,6 +10,7 @@ import HistoryPage from './pages/HistoryPage.jsx'
 import LecturerPage from './pages/LecturerPage.jsx'
 import LandingPage from './pages/LandingPage.jsx'
 import PassportSetupPage from './pages/PassportSetupPage.jsx'
+import MoodlePage from './pages/MoodlePage.jsx'
 import Brand from './components/Brand.jsx'
 
 function parseHash() {
@@ -18,7 +19,7 @@ function parseHash() {
 }
 
 const STUDENT_NAV = [
-  ['passport', 'Passport'], ['diagnose', 'Diagnose'], ['circles', 'Study circles'], ['history', 'History'],
+  ['passport', 'Passport'], ['moodle', 'APU Moodle'], ['diagnose', 'Diagnose'], ['circles', 'Study circles'], ['history', 'History'],
 ]
 
 export default function App() {
@@ -27,6 +28,7 @@ export default function App() {
   const [health, setHealth] = useState(null)
   const [catalog, setCatalog] = useState(null)
   const [route, setRoute] = useState(parseHash())
+  const [diagnosePrefill, setDiagnosePrefill] = useState(null)
 
   useEffect(() => {
     const onHash = () => setRoute(parseHash())
@@ -80,9 +82,10 @@ export default function App() {
   else if (page === 'setup') body = <PassportSetupPage user={user} catalog={catalog} onUser={setUser} />
   else if (page === 'diagnosis') body = <ResultPage id={route.id} catalog={catalog} user={user} onUser={setUser} />
   else if (page === 'passport') body = <PassportPage key={route.id || 'pp'} catalog={catalog} user={user} onUser={setUser} welcome={route.id === 'welcome'} />
+  else if (page === 'moodle') body = <MoodlePage user={user} onUser={setUser} onDiagnosePrompt={setDiagnosePrefill} />
   else if (page === 'circles') body = <CirclesPage user={user} onUser={setUser} />
   else if (page === 'history') body = <HistoryPage />
-  else body = <DiagnosePage />
+  else body = <DiagnosePage prefill={diagnosePrefill} onClearPrefill={() => setDiagnosePrefill(null)} />
 
   const llm = health && health.llm
   return (
