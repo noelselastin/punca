@@ -1,226 +1,245 @@
-import React from 'react'
+import React, { useEffect, useRef, useState } from 'react'
+import './landing.css'
 
-const scrollTo = (id) => {
-  const el = document.getElementById(id)
-  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+const SOURCES = {
+  stem: 'https://pmc.ncbi.nlm.nih.gov/articles/PMC9802213/',
+  classes: 'https://www.teaching.unsw.edu.au/assessing-large-classes',
+  learning: 'https://www.nationalacademies.org/read/28268/chapter/5',
+  ai: 'https://easychair.org/publications/preprint/4C1J',
 }
 
-// Published research only. Each figure links to its source in the list at the bottom of the page.
-const STATS = [
-  { big: '48%', text: 'of US students who started a STEM degree left STEM within 6 years. 28% changed course and 20% dropped out.', src: 1 },
-  { big: '34% vs 22%', text: 'fail rate in lecture-only classes compared with classes that include hands-on practice (225 studies).', src: 2 },
-  { big: '31% → 39%', text: 'of teenagers in OECD countries get very nervous doing maths problems, and the number is rising (2012 to 2022).', src: 3 },
-  { big: '98%', text: 'of students in a normal class scored lower than the average student who had a personal tutor.', src: 4 },
-]
+function Arrow({ diagonal = false }) {
+  return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d={diagonal ? 'M6 18 18 6M6 6h12v12' : 'M4 12h16m-6-6 6 6-6 6'} stroke="currentColor" strokeWidth="1.6" /></svg>
+}
 
-const SOURCES = [
-  { n: 1, text: 'NCES (2013). STEM Attrition: College Students’ Paths Into and Out of STEM Fields (NCES 2014-001).', url: 'https://nces.ed.gov/pubs2014/2014001rev.pdf' },
-  { n: 2, text: 'Freeman, S. et al. (2014). Active learning increases student performance in science, engineering, and mathematics. PNAS 111(23).', url: 'https://www.pnas.org/doi/10.1073/pnas.1319030111' },
-  { n: 3, text: 'OECD (2024). PISA 2022 Results, Volume V: Learning Strategies and Attitudes for Life, as reported by ACER Teacher magazine.', url: 'https://www.teachermagazine.com/au_en/articles/pisa-2022-insights-student-questions-mathematics-anxiety-and-homework' },
-  { n: 4, text: 'Bloom, B. S. (1984). The 2 Sigma Problem. Educational Researcher 13(6), 4–16.', url: 'https://doi.org/10.3102/0013189X013006004' },
-  { n: 5, text: 'The Star (16 Jul 2024). STEM enrolment hits 50.83% for 2024, says Education Ministry.', url: 'https://www.thestar.com.my/news/nation/2024/07/16/stem-enrolment-hits-5083-for-2024-up-from-4184-in-2019-says-education-ministry' },
-  { n: 6, text: 'Ausubel, D. P. (1968). Educational Psychology: A Cognitive View. Holt, Rinehart and Winston.', url: null },
-]
+function Emblem() {
+  return <svg viewBox="0 0 64 64" fill="none" aria-hidden="true"><circle cx="32" cy="32" r="26" /><ellipse cx="32" cy="32" rx="12" ry="26" /><path d="M6 32h52M11 17h42M11 47h42M32 6v52" /><path d="m18 40 28-21-10 28-5-13Z" className="pn-emblem-plane" /></svg>
+}
 
-const PROBLEMS = [
-  { who: 'Students', text: 'can’t see which earlier topic they’re missing. They only feel that “this is hard”, re-read the slides and lose confidence.' },
-  { who: 'Lecturers', text: 'can’t check every student in a big class, so they usually find out at exam time.' },
-  { who: 'AI chatbots', text: 'answer the question you typed, but don’t check whether something earlier is the real problem.' },
-  { who: 'Campus support', text: 'exists (consultations, peer tutoring, study groups), but students don’t know which one they need, or when.' },
-]
+function jumpTo(id) {
+  const section = document.getElementById(id)
+  if (!section) return
+  section.focus({ preventScroll: true })
+  section.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' })
+}
 
-const STEPS = [
-  { n: '1', title: 'Tell us what you’re stuck on', text: 'Type it in your own words, or paste the question. Punca works out which topic it is.' },
-  { n: '2', title: 'Answer up to 5 quick questions', text: 'Get one wrong and Punca checks the earlier topic it’s built on.' },
-  { n: '3', title: 'See what’s really missing', text: 'Punca names the earlier topic that’s causing the trouble, and shows the answers it based that on.' },
-  { n: '4', title: 'Fix it', text: 'A short explanation taken from your course notes, with the source shown, plus 3 practice questions.' },
-  { n: '5', title: 'Get help from people', text: 'Join a small study group of students stuck on the same thing, at a time you’re all free, with your lecturer.' },
-  { n: '6', title: 'Prove it and earn a stamp', text: 'Pass a short re-check and the topic gets a stamp in your Punca Passport.' },
-]
-
-function HeroPassport() {
-  return (
-    <div className="lp-pp" aria-label="Example Punca Passport page">
-      <div className="lp-pp-head">
-        <span>PUNCA PASSPORT</span><span>Module: AI Methods</span>
-      </div>
-      <div className="lp-pp-body">
-        <div className="lp-pp-region">Region: Calculus Foundations</div>
-        <div className="lp-visas">
-          <div className="lp-visa"><b>Derivatives</b><span className="stamp mini"><span className="stamp-top">Verified</span><span className="stamp-mid">PUNCA</span></span></div>
-          <div className="lp-visa entry"><b>Chain rule</b><em>Entry required</em></div>
-        </div>
-        <div className="lp-pp-region">Region: Linear Algebra</div>
-        <div className="lp-visas">
-          <div className="lp-visa"><b>Dot product</b><span className="stamp mini"><span className="stamp-top">Verified</span><span className="stamp-mid">PUNCA</span></span></div>
-          <div className="lp-visa"><b>Matrix multiplication</b><span className="stamp mini endorsed"><span className="stamp-top">Endorsed</span><span className="stamp-mid">PUNCA</span></span></div>
-        </div>
-        <div className="lp-pp-next">
-          <div><small>Next destination</small><b>Backpropagation</b></div>
-          <div className="lp-route"><span className="gap">Chain rule</span>→<span>Gradient descent</span>→<span>Backprop</span></div>
-        </div>
-      </div>
+function PassportStill() {
+  return <div className="pn-still" role="img" aria-label="Illustrative Punca passport and boarding pass: from a missing concept to a clearer next step">
+    <div className="pn-orbit pn-orbit-one" /><div className="pn-orbit pn-orbit-two" />
+    <div className="pn-cover">
+      <div className="pn-cover-top"><span>THE LEARNING PASSPORT</span><span>MY / 01</span></div>
+      <Emblem />
+      <div className="pn-cover-name">PUNCA</div>
+      <div className="pn-cover-sub">A little progress.<br />A world of possibility.</div>
+      <div className="pn-cover-bottom"><span>STUDENT EDITION</span><span>✦</span></div>
     </div>
-  )
+    <div className="pn-boarding">
+      <div className="pn-boarding-head"><span>PUNCA AIR / LEARNING JOURNEY</span><span>↗</span></div>
+      <div className="pn-boarding-route"><div><small>FROM</small><b>STUCK</b></div><span>⟶</span><div><small>TO</small><b>I GET IT.</b></div></div>
+      <div className="pn-boarding-bottom"><div><small>NEXT CHECKPOINT</small><strong>Find the missing piece</strong></div><div className="pn-barcode" /></div>
+    </div>
+    <span className="pn-still-note">Your journey. Your pace.</span>
+  </div>
 }
+
+const FLIGHT = [
+  { short: 'Check the basics', title: 'Start with what you already know.', text: 'Describe the topic that has you stuck. Up to five short questions help trace the earlier concepts it depends on.', path: 'M80 220 Q100 150 220 185' },
+  { short: 'Find the gap', title: 'One missing connection comes into view.', text: 'In this example, the chain rule needs attention before backpropagation. An unstamped checkpoint shows where to focus.', path: 'M220 185 C320 95 400 105 480 200' },
+  { short: 'Meet your people', title: 'Take a detour. Learn together.', text: 'Work through an explanation and practice, or join a study circle around the same gap and shared free time. Lecturer sessions need confirmation.', path: 'M480 200 C520 245 510 335 655 335' },
+  { short: 'Return & re-check', title: 'Come back and show what clicked.', text: 'Return to the missed concept for a re-check. A stamp is earned when the check brings your understanding to Solid; joining a group alone does not earn one.', path: 'M655 335 C770 420 330 420 380 280 Q400 230 480 200' },
+  { short: 'Keep moving', title: 'A new stamp. A clearer way forward.', text: 'The earlier gap is cleared. Move on to the next concept and keep building your passport. A lecturer can later countersign an earned stamp.', path: 'M480 200 C590 95 755 100 870 185' },
+]
+
+function Checkpoint({ x, y, name, number, cleared, active, destination }) {
+  return <g transform={`translate(${x} ${y})`} className={`pn-checkpoint ${cleared ? 'is-cleared' : active ? 'is-gap' : ''}`}>
+    <circle r="55" className="pn-stamp-outer" />
+    <circle r="47" className="pn-stamp-inner" />
+    <text y="-20" className="pn-svg-micro">{cleared ? 'VERIFIED' : active ? 'ENTRY REQUIRED' : destination ? 'DESTINATION' : 'CHECKPOINT'}</text>
+    <text y="9" className="pn-svg-symbol">{cleared ? '✓' : number}</text>
+    <text y="31" className="pn-svg-micro">PUNCA PASSPORT</text>
+    <text y="83" className="pn-svg-label">{name}</text>
+  </g>
+}
+
+function FlightJourney() {
+  const [stage, setStage] = useState(0)
+  const [playing, setPlaying] = useState(true)
+  const [reduced, setReduced] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+  const [visible, setVisible] = useState(false)
+  const [arrived, setArrived] = useState(false)
+  const [selection, setSelection] = useState(0)
+  const host = useRef(null)
+  const artwork = useRef(null)
+  const plane = useRef(null)
+  const paths = useRef([])
+  const elapsed = useRef(0)
+  const manual = useRef(false)
+  const duration = 3300
+
+  useEffect(() => {
+    const query = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const change = () => { setReduced(query.matches); if (query.matches) setPlaying(false) }
+    query.addEventListener('change', change)
+    const observer = new IntersectionObserver(([entry]) => setVisible(entry.isIntersecting), { threshold: 0.12 })
+    observer.observe(host.current)
+    return () => { query.removeEventListener('change', change); observer.disconnect() }
+  }, [])
+
+  useEffect(() => {
+    const path = paths.current[stage]
+    const total = path.getTotalLength()
+    const draw = (progress) => {
+      const distance = total * Math.min(1, progress)
+      const point = path.getPointAtLength(distance)
+      const before = path.getPointAtLength(Math.max(0, distance - 1))
+      const after = path.getPointAtLength(Math.min(total, distance + 1))
+      const angle = Math.atan2(after.y - before.y, after.x - before.x) * 180 / Math.PI
+      plane.current.setAttribute('transform', `translate(${point.x} ${point.y}) rotate(${angle})`)
+      if (artwork.current.scrollWidth > artwork.current.clientWidth) {
+        artwork.current.scrollLeft = point.x * artwork.current.scrollWidth / 1080 - artwork.current.clientWidth / 2
+      }
+    }
+    if (reduced || manual.current) { draw(1); setArrived(true) }
+    else draw(elapsed.current / duration)
+    if (!playing || !visible || reduced) return
+    let frame
+    let last
+    const tick = (time) => {
+      if (last !== undefined && !document.hidden) elapsed.current += Math.min(time - last, 60)
+      last = time
+      draw(elapsed.current / duration)
+      if (elapsed.current >= duration) setArrived(true)
+      if (elapsed.current >= duration + 1500) {
+        if (stage === FLIGHT.length - 1) { setPlaying(false); return }
+        elapsed.current = 0
+        setArrived(false)
+        setStage(stage + 1)
+        return
+      }
+      frame = requestAnimationFrame(tick)
+    }
+    frame = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(frame)
+  }, [stage, playing, visible, reduced, selection])
+
+  const choose = (index) => {
+    manual.current = true
+    elapsed.current = duration
+    setPlaying(false)
+    setArrived(true)
+    setStage(index)
+    setSelection(value => value + 1)
+  }
+  const replay = () => {
+    if (reduced) { choose(0); return }
+    manual.current = false
+    elapsed.current = 0
+    setArrived(false)
+    setStage(0)
+    setPlaying(true)
+    setSelection(value => value + 1)
+  }
+  const cleared = stage > 3 || (stage === 3 && arrived)
+
+  return <div className="pn-flight" ref={host}>
+    <div className="pn-flight-top"><span><i /> AN EXAMPLE LEARNING JOURNEY</span><div>
+      {!reduced && <button onClick={() => { if (!playing && stage === 4 && arrived) { replay(); return }; manual.current = false; setPlaying(!playing) }}>{playing ? 'Pause animation' : stage === 4 && arrived ? 'Play again' : 'Play animation'}</button>}
+      <button onClick={replay}>{reduced ? 'First checkpoint' : 'Replay'} <span aria-hidden="true">↺</span></button>
+    </div></div>
+    <div className="pn-flight-art" ref={artwork}>
+      <svg viewBox="0 0 1080 440" role="img" aria-labelledby="pn-flight-title pn-flight-desc">
+        <title id="pn-flight-title">A flight through your learning passport</title>
+        <desc id="pn-flight-desc">An example route from derivatives to a chain-rule gap, a study circle, a return for a re-check, and onward to backpropagation. Choose any of the five steps below to explore.</desc>
+        <defs>
+          <pattern id="pn-paper-grid" width="24" height="24" patternUnits="userSpaceOnUse"><path d="M24 0H0V24" fill="none" stroke="#18354b" strokeOpacity=".045" /></pattern>
+          <linearGradient id="pn-fold"><stop stopColor="#18354b" stopOpacity="0" /><stop offset=".5" stopColor="#18354b" stopOpacity=".12" /><stop offset="1" stopColor="#18354b" stopOpacity="0" /></linearGradient>
+        </defs>
+        <path d="M18 26Q275 9 540 31Q805 9 1062 26V410Q805 393 540 415Q275 393 18 410Z" fill="#f6f1e5" />
+        <path d="M18 26Q275 9 540 31Q805 9 1062 26V410Q805 393 540 415Q275 393 18 410Z" fill="url(#pn-paper-grid)" />
+        <path d="M34 43Q280 27 524 46M556 46Q800 27 1046 43" fill="none" stroke="#c7c2b7" />
+        <rect x="520" y="31" width="40" height="376" fill="url(#pn-fold)" />
+        <text x="55" y="74" className="pn-svg-heading">PUNCA / FOUNDATIONS</text><text x="1025" y="74" textAnchor="end" className="pn-svg-heading">VISAS &amp; CHECKPOINTS</text>
+        <text x="55" y="385" className="pn-svg-micro">01 / UNDERSTANDING STARTS HERE</text><text x="1025" y="385" textAnchor="end" className="pn-svg-micro">02 / KEEP EXPLORING</text>
+        {FLIGHT.map((item, index) => <path key={item.short} d={item.path} ref={el => { paths.current[index] = el }} className={`pn-flight-path ${index === stage ? 'is-current' : ''} ${index < stage ? 'is-travelled' : ''}`} />)}
+        <Checkpoint x={220} y={185} name="Derivatives" number="01" cleared={stage > 0 || arrived} />
+        <Checkpoint x={480} y={200} name="Chain rule" number="02" cleared={cleared} active={stage >= 1 && !cleared} />
+        <Checkpoint x={870} y={185} name="Backpropagation" number="03" cleared={stage === 4 && arrived} destination />
+        <g transform="translate(655 335)" className={`pn-peer-stop ${stage === 2 ? 'is-active' : ''}`}>
+          <rect x="-85" y="-38" width="170" height="76" rx="8" />
+          <g fill="none" stroke="currentColor" strokeWidth="1.6"><circle cx="-17" cy="-13" r="5" /><circle cx="0" cy="-17" r="6" /><circle cx="17" cy="-13" r="5" /><path d="M-25 2q0-13 12-9M-10 2q0-16 20 0M13-7q12-4 12 9" /></g>
+          <text y="23" className="pn-svg-micro">STUDY CIRCLE</text>
+        </g>
+        <g ref={plane} className="pn-airplane"><circle r="25" fill="#e5b65a" fillOpacity=".2" /><path d="M23 0 6-5-5-22-11-22-5-5-18-4-24-11-28-11-23 0-28 11-24 11-18 4-5 5-11 22-5 22 6 5Z" fill="#17374c" stroke="#f6f1e5" strokeWidth="1.8" /></g>
+      </svg>
+    </div>
+    <div className="pn-flight-caption" aria-live={playing ? 'off' : 'polite'}><span className="pn-stage-number">0{stage + 1}<small>/ 05</small></span><div><h3>{FLIGHT[stage].title}</h3><p>{FLIGHT[stage].text}</p></div></div>
+    <div className="pn-flight-stages" aria-label="Explore the learning journey">
+      {FLIGHT.map((item, i) => <button key={item.short} className={i === stage ? 'is-current' : ''} aria-pressed={i === stage} onClick={() => choose(i)}><span>0{i + 1}</span>{item.short}<Arrow /></button>)}
+    </div>
+  </div>
+}
+
+const FAQ = [
+  ['How is this different from asking an AI chatbot?', <>Punca checks the earlier concepts behind your question, then shows the answers that led to its suggested gap. You get a focused explanation with course-note sources, practice, and a re-check. The aim is to help you decide what to learn next.</>],
+  ['What can I study in the prototype?', <>The current prototype covers 37 connected concepts across maths, linear algebra, calculus and machine learning, using a curated question bank and sample course notes. It does not cover every APU module yet.</>],
+  ['How do I earn a passport stamp?', <>Work on a concept and pass re-checks until your understanding reaches Solid. A diagnosis or a study-circle visit alone does not earn a stamp. Lecturers can countersign earned stamps. These are learning aids, not academic grades or qualifications.</>],
+  ['Can I study with other students?', <>Yes. Share your free hours to find a small study circle around a common gap. Punca can suggest a lecturer slot when one is available; the lecturer still needs to confirm. The demonstration cohort uses synthetic students.</>],
+  ['Who can see my gaps and my passport?', <>Sharing your name and passport is opt-in. Lecturer dashboards show aggregate demand and hide groups smaller than three. This is a local hackathon prototype, so use demo details while exploring it.</>],
+  ['Is it free, and what if Punca gets it wrong?', <>The prototype is free to try. Its diagnosis is an estimate, and five questions can miss a deeper gap. You can challenge a result with “I actually know this” and take a re-check. Use the linked notes and your lecturer to check anything uncertain.</>],
+]
 
 export default function LandingPage({ user, onStart, onSignIn }) {
-  const signedIn = !!user
-  return (
-    <div className="lp">
-      <header className="lp-nav">
-        <a className="brand" href="#/"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M32 8c-8 10-16 18-16 28a16 16 0 0 0 32 0c0-10-8-18-16-28z" /><circle cx="32" cy="38" r="5" /></svg><span>Punca</span></a>
-        <nav>
-          <button onClick={() => scrollTo('problem')}>Problem</button>
-          <button onClick={() => scrollTo('impact')}>Impact</button>
-          <button onClick={() => scrollTo('solution')}>How it works</button>
-          <button onClick={() => scrollTo('passport')}>Passport</button>
-          <button onClick={() => scrollTo('lecturers')}>For lecturers</button>
-        </nav>
-        <div className="lp-nav-cta">
-          {!signedIn && <button className="btn ghost small" onClick={onSignIn}>Sign in</button>}
-          <button className="btn primary small" onClick={onStart}>{signedIn ? 'Open my passport' : 'Create my passport'}</button>
-        </div>
-      </header>
+  const startLabel = user ? (user.role === 'lecturer' ? 'Open my dashboard' : 'Open my passport') : 'Create my passport'
+  return <div className="pn-landing">
+    <a className="pn-skip" href="#pn-main" onClick={e => { e.preventDefault(); jumpTo('pn-main') }}>Skip to content</a>
+    <header className="pn-nav">
+      <a className="pn-brand" href="#/" aria-label="Punca home"><span className="pn-brand-icon">p<span>↗</span></span>punca<span className="pn-brand-dot">.</span></a>
+      <nav aria-label="Page sections"><button onClick={() => jumpTo('pn-why')}>Why Punca</button><button onClick={() => jumpTo('pn-journey')}>The journey</button><button onClick={() => jumpTo('pn-faq')}>Questions</button></nav>
+      <div className="pn-nav-actions">{!user && <button className="pn-text-button" onClick={onSignIn}>Sign in</button>}<button className="pn-button pn-button-small" onClick={onStart}>{startLabel}<Arrow diagonal /></button></div>
+    </header>
 
-      <section className="lp-hero">
-        <div className="lp-hero-text">
-          <div className="lp-eyebrow">Built for APU students</div>
-          <h1>Stuck on a topic?<br /><span>Find the earlier lesson that’s holding you back.</span></h1>
-          <p className="lp-lead">Often you’re not bad at the new topic. You just missed something it builds on. Punca asks you up to 5 quick questions to find it, then helps you fix it.</p>
-          <p className="lp-malay">Cari puncanya, bukan sekadar jawapannya. <span>Find the cause, not just the answer.</span></p>
-          <div className="lp-cta">
-            <button className="btn primary big" onClick={onStart}>{signedIn ? 'Open my passport' : 'Create my passport'}</button>
-            <button className="btn big" onClick={() => scrollTo('solution')}>See how it works</button>
-          </div>
-          <ul className="lp-ticks">
-            <li>Free for APU students</li><li>Not a grade</li><li>Sharing is opt-in</li>
-          </ul>
+    <main id="pn-main" tabIndex={-1}>
+      <section className="pn-hero pn-container">
+        <div className="pn-hero-copy"><p className="pn-eyebrow"><span /> FOR THE MOMENT IT STOPS MAKING SENSE</p>
+          <h1>Three hours in.<br />Still on the<br /><em>same slide?</em></h1>
+          <p className="pn-hero-lead">The missing piece might be a topic from last semester. Find it, work through it, and get moving again.</p>
+          <div className="pn-hero-actions"><button className="pn-button" onClick={onStart}>{startLabel}<Arrow diagonal /></button><button className="pn-link-button" onClick={() => jumpTo('pn-journey')}>See the journey <span aria-hidden="true">↓</span></button></div>
+          <p className="pn-hero-foot">Up to 5 questions to find a starting point.<br /><span>Free prototype · Made for APU students</span></p>
         </div>
-        <HeroPassport />
+        <PassportStill />
       </section>
 
-      <section id="problem" className="lp-section">
-        <div className="lp-kicker">The problem</div>
-        <h2>New topics are built on old ones. So are the struggles.</h2>
-        <p className="lp-sub">In maths, science, engineering and computing, every topic builds on earlier ones. When a new topic feels impossible, the real problem is often an older one you never fully understood. You can’t see that, so you re-read the same slides and fall further behind. Nobody connects <em>“I’m stuck on this lab”</em> to <em>“you missed this earlier topic, and here’s how to fix it.”</em></p>
-        <div className="lp-cards four">
-          {PROBLEMS.map((p) => <div key={p.who} className="lp-card"><h3>{p.who}</h3><p>{p.text}</p></div>)}
+      <div className="pn-route-strip" aria-label="Find the gap, build understanding, learn together, earn your stamp"><span>FIND THE GAP</span><i>↗</i><span>BUILD UNDERSTANDING</span><i>↗</i><span>LEARN TOGETHER</span><i>↗</i><span>EARN YOUR STAMP</span><i>✦</i></div>
+
+      <section className="pn-evidence pn-container" id="pn-why" tabIndex={-1}>
+        <div className="pn-section-intro"><div><p className="pn-eyebrow">01 / WHY THIS MATTERS</p><h2>Small gaps.<br /><em>Long shadows.</em></h2></div><p>A new topic can depend on something you never quite understood. Re-reading the new slides may leave that earlier gap untouched. Punca helps you find a place to start.</p></div>
+        <div className="pn-evidence-grid">
+          <article className="pn-research-main"><div className="pn-stat-line"><span>48%</span><span className="pn-stat-arrow">↘</span><span>33%</span></div><h3>Foundations can shape the whole degree.</h3><p>A study of nearly 110,000 records across six US public research universities linked lower introductory STEM grades to lower chances of completing a STEM degree.</p><p className="pn-study-context">The figures show one modelled comparison: STEM-intending white men with average preparation, with C-or-better grades in every introductory course versus below C in at least one. Association, not proof of cause.</p><a className="pn-source" href={SOURCES.stem} target="_blank" rel="noreferrer">Hatfield, Brown &amp; Topaz · PNAS Nexus, 2022 <Arrow diagonal /></a></article>
+          <article className="pn-research-side"><div className="pn-stat-line pn-class-size">1,000–2,000</div><h3>Students in a single class.</h3><p>UNSW teaching guidance describes classes of this size as increasingly common, and identifies individual feedback as a challenge.</p><a className="pn-source" href={SOURCES.classes} target="_blank" rel="noreferrer">UNSW · Assessing Large Classes <Arrow diagonal /></a><div className="pn-research-note">Published research and teaching guidance.<br />These are not APU statistics or measured Punca outcomes.</div></article>
         </div>
       </section>
 
-      <section id="impact" className="lp-section lp-tint">
-        <div className="lp-kicker">Why it matters</div>
-        <h2>What the research says</h2>
-        <p className="lp-sub">Numbers from published studies (sources at the bottom of the page). Our own survey of APU students is in progress.</p>
-        <div className="lp-stats">
-          {STATS.map((s) => (
-            <div key={s.big} className="lp-stat">
-              <div className="lp-stat-big">{s.big}</div>
-              <p>{s.text}</p>
-              <a href={`#src-${s.src}`} onClick={(e) => { e.preventDefault(); scrollTo(`src-${s.src}`) }} className="lp-srclink">Source [{s.src}]</a>
-            </div>
-          ))}
-        </div>
-        <div className="lp-split">
-          <blockquote className="lp-quote">
-            “The most important single factor influencing learning is what the learner already knows.”
-            <cite>David Ausubel, 1968 [6]</cite>
-          </blockquote>
-          <div className="lp-local">
-            <div className="lp-stat-big small">50.83%</div>
-            <p>of Malaysian students were in STEM in 2024. The national target is 60%, so every student who gives up on STEM counts. <a href="#src-5" onClick={(e) => { e.preventDefault(); scrollTo('src-5') }} className="lp-srclink">Source [5]</a></p>
-          </div>
-        </div>
-        <div className="lp-bridge">
-          <div><b>Start from what you already know</b><span>What you already understand decides how well you learn the next topic [6]. Punca finds the piece that’s missing.</span></div>
-          <div><b>Practise, don’t just re-read</b><span>Students fail far less when classes include active practice [2]. Punca gives you practice questions and a study group.</span></div>
-          <div><b>Personal help for everyone</b><span>One-to-one tutoring works best but is expensive [4]. Punca gives every student the “find what’s missing” part for free.</span></div>
-        </div>
+      <section className="pn-journey-section" id="pn-journey" tabIndex={-1}><div className="pn-container">
+        <div className="pn-section-intro"><div><p className="pn-eyebrow">02 / YOUR PUNCA PASSPORT</p><h2>A way forward.<br /><em>Detours included.</em></h2></div><p>Find the checkpoint you missed. Learn on your own or with people on the same route. Come back, re-check, and let your progress leave a mark.</p></div>
+        <FlightJourney />
+        <div className="pn-journey-note"><span>ILLUSTRATION, NOT A LIVE STUDENT RECORD</span><p>Your passport is yours to customise. Stamps record passed re-checks; they are not grades.</p></div>
+      </div></section>
+
+      <section className="pn-quote-section pn-container">
+        <div><p className="pn-eyebrow">03 / THE IDEA BEHIND IT</p><h2>Built on<br /><em>what you know.</em></h2></div>
+        <figure><div className="pn-quote-mark" aria-hidden="true">“</div><blockquote>New knowledge is generated when the brain actively connects information to <em>prior knowledge and experience.</em></blockquote><figcaption><span>National Academies of Sciences, Engineering, and Medicine<br /><small>Transforming Undergraduate STEM Education, 2025 · Chapter 3</small></span><a href={SOURCES.learning} target="_blank" rel="noreferrer" aria-label="Read the National Academies research"><Arrow diagonal /></a></figcaption></figure>
       </section>
 
-      <section id="solution" className="lp-section">
-        <div className="lp-kicker">Our solution</div>
-        <h2>From “I’m stuck” to the exact topic to fix</h2>
-        <div className="lp-steps">
-          {STEPS.map((s) => <div key={s.n} className="lp-step"><span className="lp-step-n">{s.n}</span><h3>{s.title}</h3><p>{s.text}</p></div>)}
-        </div>
-        <div className="lp-demo">
-          <div className="lp-demo-q"><small>Example: a student in a machine-learning lab</small>“I don’t get how backpropagation works in my neural network lab.”</div>
-          <div className="lp-demo-a">
-            <small>Punca, after 5 quick questions</small>
-            <div className="lp-demo-h">The problem isn’t <s>Backpropagation</s>. It’s the <b>Chain rule</b> from calculus.</div>
-            <ul>
-              <li className="no">Backpropagation · incorrect</li>
-              <li className="no">Chain rule · incorrect · slip: forgot the inner derivative</li>
-              <li className="ok">Gradient descent · correct</li>
-              <li className="ok">Neural network forward pass · correct</li>
-              <li className="ok">Basic differentiation rules · correct</li>
-            </ul>
-            <div className="lp-route"><span className="gap">Chain rule</span>→<span>Backpropagation</span></div>
-          </div>
-        </div>
+      <section className="pn-faq-section pn-container" id="pn-faq" tabIndex={-1}>
+        <div><p className="pn-eyebrow">04 / BEFORE YOU TAKE OFF</p><h2>Questions,<br /><em>answered.</em></h2><p className="pn-faq-intro">A few things to know<br />before your first checkpoint.</p></div>
+        <div className="pn-faq-list">{FAQ.map(([question, answer], index) => <details key={question} open={index === 0 ? true : undefined}><summary>{question}<span className="pn-faq-toggle" aria-hidden="true" /></summary><div className="pn-faq-answer">{answer}</div></details>)}</div>
       </section>
 
-      <section id="passport" className="lp-section lp-tint">
-        <div className="lp-kicker">The Punca Passport</div>
-        <h2>Your progress, stamped</h2>
-        <p className="lp-sub">Every topic you prove you understand earns a stamp. Every missing topic is marked “entry required” until you fix it. Your passport shows how far you’ve come, and Punca shows the route to where you’re stuck.</p>
-        <div className="lp-cards three">
-          <div className="lp-card"><span className="stamp mini static"><span className="stamp-top">Verified</span><span className="stamp-mid">PUNCA</span></span><h3>Verified stamp</h3><p>Earned only by passing a re-check after you’ve worked on the gap. A first diagnosis never earns one, so guessing doesn’t work.</p></div>
-          <div className="lp-card"><span className="stamp mini endorsed static"><span className="stamp-top">Endorsed</span><span className="stamp-mid">PUNCA</span></span><h3>Endorsed stamp</h3><p>Your lecturer countersigns it after a study circle session or a consultation.</p></div>
-          <div className="lp-card"><span className="lp-entry">Entry required</span><h3>Entry required</h3><p>Points at exactly one concept to clear next, instead of a vague feeling of falling behind.</p></div>
-        </div>
-        <p className="lp-note">Stamps are study aids, not grades or credentials. No leaderboards. Nobody sees your passport unless you choose to share it.</p>
-      </section>
-
-      <section id="lecturers" className="lp-section">
-        <div className="lp-kicker">For lecturers</div>
-        <h2>See the gap before the lab, not at the exam</h2>
-        <div className="lp-split">
-          <ul className="lp-list">
-            <li><b>Who needs help, in numbers.</b> For example: “12 students need a chain-rule refresher before Lab 5.”</li>
-            <li><b>A class heatmap.</b> Which earlier topics are causing trouble in which labs.</li>
-            <li><b>Consultations that fill themselves.</b> Post your consultation hours; Punca groups students who are stuck on the same topic and free at the same time.</li>
-            <li><b>Private by default.</b> Aggregates only, hidden below 3 students; names appear only when students opt in.</li>
-          </ul>
-          <div className="lp-heat" aria-label="Example heatmap">
-            <div className="lp-heat-row head"><span /><span>Lab 2</span><span>Lab 3</span><span>Lab 5</span></div>
-            <div className="lp-heat-row"><span>Chain rule</span><i style={{ '--h': 0.1 }}>·</i><i style={{ '--h': 0.1 }}>·</i><i className="strong" style={{ '--h': 1 }}>19</i></div>
-            <div className="lp-heat-row"><span>Matrix mult.</span><i style={{ '--h': 0.1 }}>·</i><i className="strong" style={{ '--h': 0.7 }}>13</i><i style={{ '--h': 0.25 }}>4</i></div>
-            <div className="lp-heat-row"><span>Logarithms</span><i style={{ '--h': 0.2 }}>3</i><i style={{ '--h': 0.1 }}>·</i><i style={{ '--h': 0.1 }}>·</i></div>
-            <small>Illustration with synthetic numbers.</small>
-          </div>
-        </div>
-      </section>
-
-      <section className="lp-section lp-trust">
-        <div className="lp-cards four">
-          <div className="lp-card"><h3>Grounded, with citations</h3><p>Explanations come only from course notes and cite them. If the notes don’t cover it, Punca says so instead of inventing content.</p></div>
-          <div className="lp-card"><h3>Clear reasons</h3><p>You see every answer Punca used to decide what you’re missing, and you can tell it “I actually know this”.</p></div>
-          <div className="lp-card"><h3>Built on Google AI</h3><p>Gemini with a pinned model and structured JSON output. Designed for Google Cloud (Cloud Run, Firestore, Vertex AI).</p></div>
-          <div className="lp-card"><h3>Honest by design</h3><p>A probabilistic estimate, not a certified assessment. Demo cohort data is synthetic and labelled that way.</p></div>
-        </div>
-      </section>
-
-      <section className="lp-final">
-        <h2>Your first stamp is five questions away.</h2>
-        <p>Create your Punca Passport, make it yours, and find the cause, not just the answer.</p>
-        <div className="lp-cta center">
-          <button className="btn primary big" onClick={onStart}>{signedIn ? 'Open my passport' : 'Create my passport'}</button>
-          {!signedIn && <button className="btn big light" onClick={onSignIn}>I already have one: sign in</button>}
-        </div>
-      </section>
-
-      <footer className="lp-foot">
-        <h3>Sources</h3>
-        <ol className="lp-sources">
-          {SOURCES.map((s) => (
-            <li key={s.n} id={`src-${s.n}`}>{s.url ? <a href={s.url} target="_blank" rel="noreferrer noopener">{s.text}</a> : s.text}</li>
-          ))}
-        </ol>
-        <p className="fine">Punca prototype · APU Cloud Innovation Hackathon 2026 · Smart Campus &amp; Student Experience. Figures above come from the published sources listed; demo data inside the app is synthetic.</p>
-      </footer>
-    </div>
-  )
+      <section className="pn-final"><div className="pn-container"><div><p className="pn-eyebrow">YOUR NEXT CHAPTER</p><h2>Find your footing.<br /><em>Then take flight.</em></h2></div><div><p>Make a passport that feels like you.<br />Start with one concept. See where it takes you.</p><button className="pn-button pn-button-gold" onClick={onStart}>{startLabel}<Arrow diagonal /></button><small>Create an account → Customise → Explore</small></div></div></section>
+    </main>
+    <footer className="pn-footer pn-container"><div className="pn-footer-top"><a className="pn-brand" href="#/">punca.</a><p>Cari puncanya.<br /><span>Find the cause. Find your way.</span></p><span>APU CLOUD INNOVATION HACKATHON 2026<br />SMART CAMPUS &amp; STUDENT EXPERIENCE</span></div>
+      <details className="pn-source-notes"><summary>Research notes &amp; prototype limits <span>+</span></summary><div><p>The degree-completion study reports modelled probabilities, not an intervention trial. For similarly prepared, STEM-intending underrepresented minority women, the corresponding comparison was 35% versus 21%. The evidence motivates the problem; it does not establish that Punca improves retention.</p><p>Research into AI diagnosis is still developing: <a href={SOURCES.ai} target="_blank" rel="noreferrer">Li, Morley &amp; Zaki (2025), Mind the Knowledge Gap</a> is a preprint about identifying misconceptions, not proof that all AI tutors fail. Punca’s course content and cohort are prototype materials. Real-student learning outcomes have not been measured.</p></div></details>
+      <div className="pn-footer-bottom"><span>A learning companion. A work in progress.</span><button className="pn-text-button" onClick={() => jumpTo('pn-main')}>Back to top ↑</button></div>
+    </footer>
+  </div>
 }

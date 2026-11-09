@@ -12,7 +12,7 @@ Deadlines (from the hackathon Discord, check #announcements for changes):
 - [x] Concept mapping: BM25 shortlist + Gemini choice with a JSON schema, offline fallback
 - [x] Grounded remediation with citations and a "not found in course material" fallback
 - [x] Evaluation set (25 items) and runner; offline results in README section 15
-- [ ] Add a Gemini API key locally and run `python -m data.eval.run`; put the real numbers in README section 15
+- [x] Configure Gemini locally and record the live evaluation in README section 15 (25/25 mappings, 24/25 root causes; simulated development cases)
 - [ ] Review a third of the graph edges and probes written by someone else (README section 20)
 - [ ] Add 5 to 10 eval items written in real students' words (not tuned against)
 - [ ] Top 5 only: plan the Gemini Enterprise integration (for example, register the tutor as an agent)
@@ -27,6 +27,7 @@ Deadlines (from the hackathon Discord, check #announcements for changes):
 - [ ] Make the GitHub repo public before submitting, and confirm no secrets are committed (`.env` is git-ignored)
 
 ## Member 3: Frontend, content and pitch
+- [x] Redesign the landing page: student hook, verified research, animated passport flight, peer-circle detour, re-check stamps, FAQ, and responsive layouts
 - [x] Student UI: diagnose flow, result, remediation, practice, re-check, circles, history
 - [x] Passport pages and map view, opt-in sharing
 - [x] Lecturer dashboard: demand, heatmap, slot manager, confirm/decline, countersign, shared passports

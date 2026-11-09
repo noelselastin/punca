@@ -187,7 +187,7 @@ This is a hack-day build. Nothing below is claimed as done until it is.
 | Student UI and passport view (concept map as passport pages) | Member 3 | MVP done, including a public landing page (problem, sourced research figures, solution) and passport onboarding: create an account, then customise the passport (cover, emblem, name, goal, labs, privacy). |
 | Stamp rules and endorsement | Members 1, 2 and 3 | Verified and endorsed tiers done. Mentor and faded stamps (Stretch) not started. |
 | Lecturer dashboard and heatmap | Member 3 | MVP done, on synthetic cohort data. |
-| Evaluation set and accuracy measurement | Member 1 | 25 items done; offline results in section 15. Gemini run pending. |
+| Evaluation set and accuracy measurement | Member 1 | 25 simulated cases; offline and live Gemini results in section 15. |
 | Survey and pitch | Member 3 | Not started |
 
 ### What the MVP does differently from the plan
@@ -454,23 +454,34 @@ Targets for a pilot; set realistic numbers after testing.
 - **Lecturer value:** whether lecturers act on the heatmap
 - **Student trust:** survey rating of "the diagnosis matched my real gap"
 
-### Measured so far (evaluation set, offline mode)
+### Measured so far (25 simulated cases)
 
-`python -m data.eval.run --offline` on the 25 stuck-points in `data/eval/stuck_points.json` (run 9 Nov 2026; full rows in `data/eval/last_run.json`):
+Both runs used the 25 stuck-points in `data/eval/stuck_points.json` on 9 Nov 2026. The retained `data/eval/last_run.json` is the live Gemini run completed at 15:51 MYT; it superseded the earlier offline output. The offline baseline was measured with `python -m data.eval.run --offline`.
 
-| Metric | Result |
-|---|---|
-| Stuck text mapped to the expected concept (keyword search, no LLM) | 25 / 25 |
-| Root cause found, starting from the expected concept | 24 / 25 |
-| Root cause found, end to end | 24 / 25 |
-| Probes used per diagnosis (mean) | 3.92 |
+| Metric | Offline baseline | Live Gemini (`gemini-3.5-flash-lite`) |
+|---|---|---|
+| Stuck text mapped to the expected concept | 25 / 25 | 25 / 25 |
+| Root cause found, starting from the expected concept | 24 / 25 | 24 / 25 |
+| Root cause found, end to end | 24 / 25 | 24 / 25 |
+| Probes used per diagnosis (mean) | 3.92 | 3.92 |
+| Items answered by Gemini | 0 / 25 | 25 / 25 |
+| LLM errors | Not applicable | 0 |
 
 Read these carefully:
 
 - The "students" are **simulated**: each one is missing exactly one concept and answers everything else correctly. Real students guess and slip, so real accuracy will be lower.
 - The keyword list for Backpropagation was edited once after item e01 failed, so the mapping score is partly tuned to this same set. Wording from real students will score lower.
 - The one miss (e19) is a known limit: the gap (matrix multiplication) sits two levels below the target behind three other prerequisites, and the 5-probe budget runs out first.
-- The Gemini mapping has not been measured yet. Add a `GEMINI_API_KEY` and run `python -m data.eval.run` (add `--sleep 4` if the free tier rate-limits you).
+- All 25 live rows report `mappingSource: gemini`; none used keyword fallback. This is the same small development set, not held-out validation or evidence of improved real-student outcomes.
+- To repeat the live evaluation, use `python -m data.eval.run --sleep 4` with a locally configured API key. This consumes API quota and replaces `last_run.json`; preserve the previous result first if you need to compare runs.
+
+### Landing page and evidence
+
+The landing page introduces the problem, links published evidence, and illustrates a learning flight through passport checkpoints. The example visits a study circle, returns to re-check the chain rule, and earns a stamp before continuing. It is labelled as an illustration. Visitors can pause, replay, or select steps; reduced-motion users get a static, manually selectable journey. The page uses a navy, warm-paper and gold palette, a cited research quote, and an accessible FAQ.
+
+**Create my passport** keeps the existing journey: student sign-up, passport customisation, then the issued passport. Signed-in students return to their passport; staff return to the lecturer dashboard.
+
+See [the landing-page evidence notes](docs/landing-evidence.md) for the source context and claims excluded from the supplied research draft. Published statistics describe external research, not APU students or measured Punca outcomes.
 
 ## 16. Demo Script (about 3 minutes)
 
