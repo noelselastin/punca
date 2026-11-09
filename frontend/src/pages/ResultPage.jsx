@@ -163,7 +163,7 @@ export default function ResultPage({ id, catalog, user, onUser }) {
                 <div className="cites">
                   <span className="label">Sources</span>
                   {rem.data.citations.map((c) => <span key={c.sourceId} className="cite" title={c.title}>{c.sourceId}</span>)}
-                  <span className="fine">{rem.data.source === 'gemini' ? 'Written by Gemini from these notes only.' : 'Shown straight from the course notes.'}{rem.data.llmError ? ' (Gemini was unavailable.)' : ''}</span>
+                  <span className="fine">{rem.data.source === 'gemini' ? `Written by Gemini (${rem.data.model}) from these notes only.` : 'Shown straight from the course notes.'}{rem.data.llmError ? ' (Gemini was busy.)' : ''}</span>
                 </div>
               </>
             )}

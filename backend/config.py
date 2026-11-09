@@ -28,7 +28,15 @@ def _flag(name: str, default: str = "false") -> bool:
 
 # --- LLM -------------------------------------------------------------------------------------
 # Pinned model ID (README section 9: never use -latest aliases).
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash").strip()
+# Free-tier limits seen in AI Studio (9 Nov 2026): Flash-Lite models allow 15 requests/minute and 500/day each;
+# gemini-3.8-flash allows only 5/minute and 20/day, too few for an app. So Flash-Lite is the default.
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite").strip()
+# Pinned fallbacks, tried in order when a model is overloaded (503), rate-limited (429) or times out (504).
+GEMINI_FALLBACK_MODELS = [m.strip() for m in os.getenv("GEMINI_FALLBACK_MODELS", "gemini-3.1-flash-lite").split(",") if m.strip()]
+LLM_COOLDOWN_S = int(os.getenv("LLM_COOLDOWN_S", "60"))          # skip a busy / per-minute-limited model
+LLM_DAILY_COOLDOWN_S = int(os.getenv("LLM_DAILY_COOLDOWN_S", "3600"))  # after a per-day quota error
+# README section 10: a Flash-Lite model may be used for routing (mapping a stuck point to a concept).
+GEMINI_ROUTING_MODEL = os.getenv("GEMINI_ROUTING_MODEL", GEMINI_MODEL).strip()
 # Free tier: an API key from Google AI Studio (no billing needed).
 GEMINI_API_KEY = (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or "").strip()
 # Vertex AI (needs a Google Cloud project with billing or credits): USE_VERTEX=true + GCP_PROJECT.
@@ -37,7 +45,7 @@ GCP_PROJECT = os.getenv("GCP_PROJECT", "").strip()
 GCP_REGION = os.getenv("GCP_REGION", "global").strip()
 # Force the deterministic offline mode (no LLM calls), e.g. for tests and the eval baseline.
 PUNCA_OFFLINE = _flag("PUNCA_OFFLINE")
-LLM_TIMEOUT_MS = int(os.getenv("LLM_TIMEOUT_MS", "30000"))
+LLM_TIMEOUT_MS = int(os.getenv("LLM_TIMEOUT_MS", "20000"))
 
 # --- Storage ---------------------------------------------------------------------------------
 STORE_PATH = Path(os.getenv("PUNCA_STORE", str(VAR_DIR / "store.json")))

@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import re
 
+import config
 from content import Catalog
 from llm import prompts
 from llm.client import LLMClient
@@ -30,13 +31,14 @@ class LLMService:
             try:
                 res = self.client.generate_json(
                     prompts.map_prompt(stuck_input, list(self.cat.concepts.values()), [c["conceptId"] for c in shortlist]),
-                    MapResult, temperature=0.1)
+                    MapResult, temperature=0.1, prefer=config.GEMINI_ROUTING_MODEL)
                 if res["conceptId"] in self.cat.concepts:
                     cid = res["conceptId"]
                     if cid not in [c["conceptId"] for c in shortlist]:
                         out["candidates"] = [{"conceptId": cid, "name": self.cat.name(cid), "score": None}] + shortlist[:4]
                     out.update(targetConceptId=cid, justification=res["justification"].strip(),
-                               confidence=round(min(max(res["confidence"], 0.0), 1.0), 2), source="gemini")
+                               confidence=round(min(max(res["confidence"], 0.0), 1.0), 2), source="gemini",
+                               model=self.client.last_model)
                     return out
                 out["llmError"] = f"model chose an unknown concept id: {res['conceptId']!r}"
             except Exception as exc:
@@ -91,5 +93,5 @@ class LLMService:
             return dict(offline, llmError="model reported the material did not cover this concept")
         if not used:
             used = [{"sourceId": own["sourceId"], "title": own["title"]}]
-        return {"found": True, "source": "gemini", "explanation": res["explanation"].strip(),
+        return {"found": True, "source": "gemini", "model": self.client.last_model, "explanation": res["explanation"].strip(),
                 "keyPoints": [k.strip() for k in res["keyPoints"]][:3], "citations": used, "llmError": None}

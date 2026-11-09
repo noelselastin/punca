@@ -111,7 +111,7 @@ export default function DiagnosePage() {
             <h2 className="h2">This sounds like <span className="accent">{(mapping.candidates.find((c) => c.conceptId === target) || {}).name || mapping.targetName}</span></h2>
           ) : <h2 className="h2">Pick the closest concept</h2>}
           {target === mapping.targetConceptId && <p className="muted">{mapping.justification}</p>}
-          <p className="fine">Matched by {mapping.source === 'gemini' ? 'Gemini' : 'keyword search'}{mapping.llmError ? ' (Gemini was unavailable, so keyword search was used)' : ''}.</p>
+          <p className="fine">Matched by {mapping.source === 'gemini' ? `Gemini (${mapping.model})` : 'keyword search'}{mapping.llmError ? ' (Gemini was busy, so keyword search was used)' : ''}.</p>
           {mapping.candidates.length > 1 && (
             <>
               <div className="label">Not quite? Choose another:</div>

@@ -129,7 +129,8 @@ def create_app(store_path: Path | None = None, offline: bool | None = None) -> F
     # ---- public ------------------------------------------------------------------------------
     @app.get("/api/health")
     def health():
-        return {"ok": True, "llm": {"mode": llm_client.mode, "model": llm_client.model, "reason": llm_client.reason}}
+        return {"ok": True, "llm": {"mode": llm_client.mode, "model": llm_client.model, "models": llm_client.models,
+                                    "lastModel": llm_client.last_model, "reason": llm_client.reason}}
 
     @app.get("/api/catalog")
     def get_catalog():

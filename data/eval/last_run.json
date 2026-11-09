@@ -1,14 +1,14 @@
 {
  "summary": {
-  "mode": "offline",
-  "model": null,
+  "mode": "gemini-api",
+  "model": "gemini-3.5-flash-lite",
   "items": 25,
   "mappingAccuracy": 1.0,
   "engineRootCauseAccuracy": 0.96,
   "endToEndRootCauseAccuracy": 0.96,
   "meanProbes": 3.92,
   "llmErrors": 0,
-  "ranAt": "2026-11-09 15:14:27"
+  "ranAt": "2026-11-09 15:51:00"
  },
  "rows": [
   {
@@ -22,7 +22,7 @@
    "e2eRoot": "chain-rule",
    "e2eOk": true,
    "probes": 5,
-   "mappingSource": "keyword-search"
+   "mappingSource": "gemini"
   },
   {
    "id": "e02",
@@ -35,7 +35,7 @@
    "e2eRoot": "matrix-multiplication",
    "e2eOk": true,
    "probes": 3,
-   "mappingSource": "keyword-search"
+   "mappingSource": "gemini"
   },
   {
    "id": "e03",
@@ -48,7 +48,7 @@
    "e2eRoot": "logarithms",
    "e2eOk": true,
    "probes": 5,
-   "mappingSource": "keyword-search"
+   "mappingSource": "gemini"
   },
   {
    "id": "e04",
@@ -61,7 +61,7 @@
    "e2eRoot": "partial-derivatives",
    "e2eOk": true,
    "probes": 5,
-   "mappingSource": "keyword-search"
+   "mappingSource": "gemini"
   },
   {
    "id": "e05",
@@ -74,7 +74,7 @@
    "e2eRoot": "conditional-probability",
    "e2eOk": true,
    "probes": 3,
-   "mappingSource": "keyword-search"
+   "mappingSource": "gemini"
   },
   {
    "id": "e06",
@@ -87,7 +87,7 @@
    "e2eRoot": "exponents",
    "e2eOk": true,
    "probes": 3,
-   "mappingSource": "keyword-search"
+   "mappingSource": "gemini"
   },
   {
    "id": "e07",
@@ -100,7 +100,7 @@
    "e2eRoot": "dot-product",
    "e2eOk": true,
    "probes": 5,
-   "mappingSource": "keyword-search"
+   "mappingSource": "gemini"
   },
   {
    "id": "e08",
@@ -113,7 +113,7 @@
    "e2eRoot": "exponents",
    "e2eOk": true,
    "probes": 3,
-   "mappingSource": "keyword-search"
+   "mappingSource": "gemini"
   },
   {
    "id": "e09",
@@ -126,7 +126,7 @@
    "e2eRoot": "function-composition",
    "e2eOk": true,
    "probes": 4,
-   "mappingSource": "keyword-search"
+   "mappingSource": "gemini"
   },
   {
    "id": "e10",
@@ -139,7 +139,7 @@
    "e2eRoot": "linear-functions",
    "e2eOk": true,
    "probes": 5,
-   "mappingSource": "keyword-search"
+   "mappingSource": "gemini"
   },
   {
    "id": "e11",
@@ -152,7 +152,7 @@
    "e2eRoot": "mean-variance",
    "e2eOk": true,
    "probes": 4,
-   "mappingSource": "keyword-search"
+   "mappingSource": "gemini"
   },
   {
    "id": "e12",
@@ -165,7 +165,7 @@
    "e2eRoot": "summation",
    "e2eOk": true,
    "probes": 4,
-   "mappingSource": "keyword-search"
+   "mappingSource": "gemini"
   },
   {
    "id": "e13",
@@ -178,7 +178,7 @@
    "e2eRoot": "derivative-rules",
    "e2eOk": true,
    "probes": 4,
-   "mappingSource": "keyword-search"
+   "mappingSource": "gemini"
   },
   {
    "id": "e14",
@@ -191,7 +191,7 @@
    "e2eRoot": "loss-functions",
    "e2eOk": true,
    "probes": 4,
-   "mappingSource": "keyword-search"
+   "mappingSource": "gemini"
   },
   {
    "id": "e15",
@@ -204,7 +204,7 @@
    "e2eRoot": "exponents",
    "e2eOk": true,
    "probes": 3,
-   "mappingSource": "keyword-search"
+   "mappingSource": "gemini"
   },
   {
    "id": "e16",
@@ -217,7 +217,7 @@
    "e2eRoot": "summation",
    "e2eOk": true,
    "probes": 4,
-   "mappingSource": "keyword-search"
+   "mappingSource": "gemini"
   },
   {
    "id": "e17",
@@ -230,7 +230,7 @@
    "e2eRoot": "activation-functions",
    "e2eOk": true,
    "probes": 2,
-   "mappingSource": "keyword-search"
+   "mappingSource": "gemini"
   },
   {
    "id": "e18",
@@ -243,7 +243,7 @@
    "e2eRoot": "probability",
    "e2eOk": true,
    "probes": 3,
-   "mappingSource": "keyword-search"
+   "mappingSource": "gemini"
   },
   {
    "id": "e19",
@@ -256,7 +256,7 @@
    "e2eRoot": "forward-pass",
    "e2eOk": false,
    "probes": 5,
-   "mappingSource": "keyword-search"
+   "mappingSource": "gemini"
   },
   {
    "id": "e20",
@@ -269,7 +269,7 @@
    "e2eRoot": "logarithms",
    "e2eOk": true,
    "probes": 4,
-   "mappingSource": "keyword-search"
+   "mappingSource": "gemini"
   },
   {
    "id": "e21",
@@ -282,7 +282,7 @@
    "e2eRoot": "matrices",
    "e2eOk": true,
    "probes": 3,
-   "mappingSource": "keyword-search"
+   "mappingSource": "gemini"
   },
   {
    "id": "e22",
@@ -295,7 +295,7 @@
    "e2eRoot": "functions",
    "e2eOk": true,
    "probes": 3,
-   "mappingSource": "keyword-search"
+   "mappingSource": "gemini"
   },
   {
    "id": "e23",
@@ -308,7 +308,7 @@
    "e2eRoot": "vectors",
    "e2eOk": true,
    "probes": 4,
-   "mappingSource": "keyword-search"
+   "mappingSource": "gemini"
   },
   {
    "id": "e24",
@@ -321,7 +321,7 @@
    "e2eRoot": "sigmoid",
    "e2eOk": true,
    "probes": 5,
-   "mappingSource": "keyword-search"
+   "mappingSource": "gemini"
   },
   {
    "id": "e25",
@@ -334,7 +334,7 @@
    "e2eRoot": "derivative-rules",
    "e2eOk": true,
    "probes": 5,
-   "mappingSource": "keyword-search"
+   "mappingSource": "gemini"
   }
  ]
 }
