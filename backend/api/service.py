@@ -18,6 +18,10 @@ from store.local_store import LocalStore
 log = logging.getLogger("punca.api")
 
 
+PASSPORT_COVERS = ["navy", "maroon", "forest", "teal", "plum"]
+PASSPORT_EMBLEMS = ["spring", "compass", "atom", "leaf", "star"]
+
+
 class ServiceError(Exception):
     def __init__(self, status: int, message: str):
         super().__init__(message)
@@ -64,7 +68,8 @@ class PuncaService:
     @staticmethod
     def public_user(u: dict) -> dict:
         return {k: u.get(k) for k in ("uid", "role", "name", "email", "programme", "year", "department",
-                                      "availability", "consent", "createdAt")} | {"demoAccount": u.get("demoAccount", False)}
+                                      "availability", "consent", "createdAt", "passportStyle")} | {
+            "demoAccount": u.get("demoAccount", False)}
 
     def _user_by_email(self, email: str) -> dict | None:
         email = email.strip().lower()
@@ -132,6 +137,22 @@ class PuncaService:
         return user
 
     def update_profile(self, user: dict, data: dict) -> dict:
+        if "passport" in data:
+            user["passportStyle"] = self._passport_style(user, data["passport"] or {})
+        if "programme" in data:
+            user["programme"] = (data["programme"] or "").strip()[:80] or None
+        if "year" in data:
+            year = data["year"]
+            if year in (None, ""):
+                user["year"] = None
+            else:
+                try:
+                    year = int(year)
+                except (TypeError, ValueError):
+                    raise ServiceError(400, "Year of study must be a number from 1 to 5.")
+                if not 1 <= year <= 5:
+                    raise ServiceError(400, "Year of study must be a number from 1 to 5.")
+                user["year"] = year
         if "availability" in data:
             slots = data["availability"] or []
             if not isinstance(slots, list) or not all(isinstance(s, str) and sched.valid_slot(s) for s in slots):
@@ -147,6 +168,35 @@ class PuncaService:
                     self.store.put("stamps", f"{s['uid']}_{s['conceptId']}", s, save=False)
         self.store.put("users", user["uid"], user)
         return self.public_user(user)
+
+    def _passport_style(self, user: dict, p: dict) -> dict:
+        """Validate passport customisation: cover colour, emblem, name on the passport, motto, labs in focus."""
+        cur = dict(user.get("passportStyle") or {})
+        if "cover" in p:
+            if p["cover"] not in PASSPORT_COVERS:
+                raise ServiceError(400, "Pick one of the passport cover colours.")
+            cur["cover"] = p["cover"]
+        if "emblem" in p:
+            if p["emblem"] not in PASSPORT_EMBLEMS:
+                raise ServiceError(400, "Pick one of the passport emblems.")
+            cur["emblem"] = p["emblem"]
+        if "displayName" in p:
+            name = (p["displayName"] or "").strip()
+            if not 2 <= len(name) <= 40:
+                raise ServiceError(400, "The name on your passport must be 2 to 40 characters.")
+            cur["displayName"] = name
+        if "motto" in p:
+            cur["motto"] = (p["motto"] or "").strip()[:80] or None
+        if "focusLabIds" in p:
+            labs = {lab["id"] for lab in self.cat.labs}
+            cur["focusLabIds"] = [x for x in (p["focusLabIds"] or []) if x in labs]
+        cur.setdefault("cover", PASSPORT_COVERS[0])
+        cur.setdefault("emblem", PASSPORT_EMBLEMS[0])
+        cur.setdefault("displayName", user["name"])
+        cur.setdefault("motto", None)
+        cur.setdefault("focusLabIds", [])
+        cur["setupDone"] = True
+        return cur
 
     # ================================================================== mastery =============
     def mastery_map(self, uid: str) -> dict:
@@ -390,7 +440,13 @@ class PuncaService:
                    "entryRequiredId": first_open,
                    "route": [{"id": c, "name": self.cat.name(c), "stamped": c in stamps} for c in open_diag["path"]],
                    "diagnosisId": open_diag["id"]}
-        return {"holder": user["name"], "holderNo": f"Student #A-{holder_no:04d}", "module": self.cat.course["name"],
+        style = dict(user.get("passportStyle") or {})
+        style.setdefault("cover", PASSPORT_COVERS[0])
+        style.setdefault("emblem", PASSPORT_EMBLEMS[0])
+        lab_names = {lab["id"]: lab["name"] for lab in self.cat.labs}
+        return {"holder": style.get("displayName") or user["name"], "holderNo": f"Student #A-{holder_no:04d}",
+                "style": style, "focusLabs": [lab_names[x] for x in style.get("focusLabIds", []) if x in lab_names],
+                "programme": user.get("programme"), "year": user.get("year"), "module": self.cat.course["name"],
                 "regions": [{"name": r, "concepts": regions[r]} for r in order if r in regions],
                 "stamps": len(stamps), "endorsed": sum(1 for s in stamps.values() if s["tier"] == "endorsed"),
                 "next": nxt, "shared": bool(user["consent"].get("sharePassport"))}

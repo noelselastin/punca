@@ -110,6 +110,22 @@ def test_demo_flow_diagnose_stamp_circle_endorse(client, catalog):
     assert chain["state"] == "endorsed" and chain["endorsedBy"] == "Dr. Demo Lecturer"
 
 
+def test_passport_customisation(client):
+    tok = signup(client).json()["token"]
+    me = client.get("/api/me", headers=auth(tok)).json()
+    assert me["passportStyle"] is None  # not set up yet: the app sends new students to the setup page
+    body = {"passport": {"cover": "forest", "emblem": "atom", "displayName": "Nisha R.", "motto": "Own Lab 5",
+                         "focusLabIds": ["lab5", "nope"]}, "programme": "BSc Data Science", "year": 2}
+    r = client.patch("/api/me", json=body, headers=auth(tok))
+    assert r.status_code == 200, r.text
+    st = r.json()["passportStyle"]
+    assert st["setupDone"] and st["cover"] == "forest" and st["focusLabIds"] == ["lab5"]
+    pp = client.get("/api/me/passport", headers=auth(tok)).json()
+    assert pp["holder"] == "Nisha R." and pp["style"]["emblem"] == "atom" and pp["focusLabs"] == ["Lab 5: Backpropagation"]
+    assert client.patch("/api/me", json={"passport": {"cover": "neon"}}, headers=auth(tok)).status_code == 400
+    assert client.patch("/api/me", json={"passport": {"displayName": "X"}}, headers=auth(tok)).status_code == 400
+
+
 def test_students_cannot_read_each_others_diagnoses(client):
     a = signup(client, email="a@example.edu").json()["token"]
     b = signup(client, email="b@example.edu").json()["token"]

@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { api } from '../api.js'
 import { ErrorNote, Spinner, Toggle, go, useAsync } from '../components/common.jsx'
 import ConceptMap, { MapLegend } from '../components/ConceptMap.jsx'
+import PassportCover from '../components/PassportCover.jsx'
 
 const fmt = (iso) => (iso ? new Date(iso).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' }) : '')
 
@@ -30,7 +31,7 @@ function Visa({ c }) {
   )
 }
 
-export default function PassportPage({ catalog, user, onUser }) {
+export default function PassportPage({ catalog, user, onUser, welcome }) {
   const [pp, reload] = useAsync(() => api('/me/passport'), [])
   const [view, setView] = useState('pages')
   const [error, setError] = useState(null)
@@ -51,19 +52,20 @@ export default function PassportPage({ catalog, user, onUser }) {
 
   return (
     <div className="passport-page">
-      <div className="passport">
-        <div className="pp-cover">
+      {welcome && (
+        <div className="welcome card">
           <div>
-            <div className="pp-title">PUNCA PASSPORT</div>
-            <div className="pp-sub">Pasport Punca · study aid, not a grade or credential</div>
+            <div className="eyebrow">Passport issued</div>
+            <h2 className="h2">Welcome aboard, {p.holder}. Your first stamp is five questions away.</h2>
+            <p className="muted">Tell Punca where you’re stuck. It finds the concept you’re really missing, helps you fix it, and a passed re-check stamps it here.</p>
           </div>
-          <div className="pp-holder">
-            <div><span>Holder</span><b>{p.holder}</b></div>
-            <div><span>No.</span><b>{p.holderNo}</b></div>
-            <div><span>Module</span><b>{p.module}</b></div>
-          </div>
-          <div className="pp-count"><b>{p.stamps}</b><span>stamps</span><b>{p.endorsed}</b><span>endorsed</span></div>
+          <button className="btn primary" onClick={() => go('diagnose')}>Find my first gap</button>
         </div>
+      )}
+      <div className="passport">
+        <PassportCover style={p.style} holder={p.holder} holderNo={p.holderNo} module={p.module} programme={p.programme}
+          year={p.year} focusLabs={p.focusLabs} stamps={p.stamps} endorsed={p.endorsed} />
+        <div className="pp-actions"><button className="btn small" onClick={() => go('setup')}>Customise passport</button></div>
 
         {p.next ? (
           <div className="pp-next">

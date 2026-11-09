@@ -61,7 +61,9 @@ def seed_store(store: LocalStore, cat: Catalog, rng_seed: int = 2026) -> None:
     store.put("users", DEMO_STUDENT_UID, _user(
         DEMO_STUDENT_UID, "student", "Demo Student", email=DEMO_STUDENT_EMAIL,
         passwordHash=auth.hash_password(DEMO_PASSWORD), programme="BSc (Hons) Computer Science (AI)", year=2,
-        availability=["Mon-10", "Tue-14", "Tue-15", "Wed-16", "Thu-11", "Thu-12"], demoAccount=True), save=False)
+        availability=["Mon-10", "Tue-14", "Tue-15", "Wed-16", "Thu-11", "Thu-12"], demoAccount=True,
+        passportStyle={"cover": "navy", "emblem": "spring", "displayName": "Demo Student",
+                       "motto": "Pass Lab 5 without guessing", "focusLabIds": ["lab5"], "setupDone": True}), save=False)
     store.put("users", DEMO_LECTURER_UID, _user(
         DEMO_LECTURER_UID, "lecturer", "Dr. Demo Lecturer", email=DEMO_LECTURER_EMAIL,
         passwordHash=auth.hash_password(DEMO_PASSWORD), department="School of Computing (demo)",

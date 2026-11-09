@@ -184,7 +184,7 @@ This is a hack-day build. Nothing below is claimed as done until it is.
 | Grounded remediation (Vertex AI Search) | Member 1 | MVP done with local retrieval over `data/notes/` and citations; Vertex AI Search not wired. |
 | Cloud setup, auth and API | Member 2 | API done (FastAPI). Student sign-up and sign-in done (local accounts). Cloud Run, Firestore and Firebase Auth not set up. |
 | Study Circles and slot matching | Member 2 | MVP done (availability grid, lecturer slots, gap clinics). |
-| Student UI and passport view (concept map as passport pages) | Member 3 | MVP done. |
+| Student UI and passport view (concept map as passport pages) | Member 3 | MVP done, including a public landing page (problem, sourced research figures, solution) and passport onboarding: create an account, then customise the passport (cover, emblem, name, goal, labs, privacy). |
 | Stamp rules and endorsement | Members 1, 2 and 3 | Verified and endorsed tiers done. Mentor and faded stamps (Stretch) not started. |
 | Lecturer dashboard and heatmap | Member 3 | MVP done, on synthetic cohort data. |
 | Evaluation set and accuracy measurement | Member 1 | 25 items done; offline results in section 15. Gemini run pending. |
@@ -527,14 +527,15 @@ On first start the backend seeds synthetic demo data into `backend/var/store.jso
 
 **Accounts**
 
-- Students create their own account on the sign-in page ("Create student account").
+- Visitors land on the public page. **Create my passport** leads to a student sign-up, then to passport customisation.
+- The research figures on the landing page come from published sources, listed and linked at the bottom of that page. They are not APU data; the APU survey (section 1) is still to do.
 - The sign-in page also has two demo buttons: **Try the demo student** and **Lecturer view (demo staff)**. Their logins are defined in `backend/store/seed.py` and exist only in the local demo store.
 - There is no lecturer sign-up. Lecturer accounts would come from the university later.
 
 **Tests and evaluation** (from the repo root, with the backend virtual environment active)
 
 ```bash
-python -m pytest                     # 20 tests: engine, content checks, accounts, full demo flow
+python -m pytest                     # 21 tests: engine, content checks, accounts, passport, full demo flow
 python -m data.eval.run --offline    # evaluation set without an LLM
 python -m data.eval.run              # same, using Gemini when GEMINI_API_KEY is set
 ```

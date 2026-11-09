@@ -43,6 +43,9 @@ class LoginBody(BaseModel):
 class ProfileBody(BaseModel):
     availability: list[str] | None = None
     consent: dict | None = None
+    passport: dict | None = None
+    programme: str | None = None
+    year: int | str | None = None
 
 
 class MapBody(BaseModel):
