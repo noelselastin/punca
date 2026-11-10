@@ -233,3 +233,651 @@ input[aria-invalid='true'] { border-color: var(--gap); }
 @media (prefers-reduced-motion: reduce) {
   .shell *, .auth * { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
 }
+
+
+/* --- Passport Photo & Custom Labs --- */
+.pp-photo-frame {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 2px solid rgba(229, 182, 90, 0.75);
+  background: rgba(19, 44, 62, 0.9);
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.22);
+}
+.pp-photo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.pp-photo-UploadRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 6px;
+  padding: 12px;
+  border: 1px solid rgba(23, 55, 76, 0.14);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.55);
+}
+.pp-photo-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.lab-add-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.lab-add-row input {
+  flex: 1;
+}
+
+/* --- Confidence Selector & 5-10 Question Dots --- */
+.dots i.min-req {
+  border: 1px dashed rgba(23, 55, 76, 0.45);
+}
+.confidence-picker {
+  margin: 12px 0 14px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(23, 55, 76, 0.04);
+  border: 1px solid rgba(23, 55, 76, 0.12);
+}
+.confidence-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #17374c;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.confidence-pills {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.conf-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(23, 55, 76, 0.18);
+  background: #fff;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+}
+.conf-pill b {
+  font-size: 13px;
+  color: #17374c;
+}
+.conf-pill small {
+  font-size: 11px;
+  color: #5b6b79;
+}
+.conf-pill.on {
+  border-color: #17374c;
+  background: #17374c;
+  color: #f6f1e5;
+}
+.conf-pill.on b,
+.conf-pill.on small {
+  color: #f6f1e5;
+}
+
+/* --- Diagnose Document Upload & Required Foundations --- */
+.doc-upload-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(23, 55, 76, 0.04);
+  border: 1px dashed rgba(23, 55, 76, 0.22);
+}
+.doc-upload-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.attached-file-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(229, 182, 90, 0.14);
+  border: 1px solid rgba(229, 182, 90, 0.5);
+}
+.inline-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 12px;
+}
+.drive-picker-panel {
+  margin-top: 10px;
+  padding: 12px;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid rgba(23, 55, 76, 0.16);
+}
+.drive-picker-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.drive-file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.drive-file-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(23, 55, 76, 0.03);
+  border: 1px solid rgba(23, 55, 76, 0.1);
+}
+.foundations-box {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(23, 55, 76, 0.12);
+}
+.foundations-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+.foundation-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 9px;
+  border: 1px solid rgba(23, 55, 76, 0.16);
+  background: #fff;
+  cursor: pointer;
+  text-align: left;
+}
+.foundation-item.on {
+  border-color: #17374c;
+  box-shadow: 0 0 0 2px rgba(23, 55, 76, 0.15);
+}
+.foundation-top {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+}
+
+/* --- Confidence Summary & Google Workspace / Chat --- */
+.conf-summary-box {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(23, 55, 76, 0.05);
+  border: 1px solid rgba(23, 55, 76, 0.14);
+}
+.conf-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  font-size: 13px;
+}
+.circle-chat-box {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: rgba(23, 55, 76, 0.04);
+  border: 1px solid rgba(23, 55, 76, 0.12);
+}
+.circle-chat-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 160px;
+  overflow-y: auto;
+  margin: 8px 0;
+}
+.chat-msg {
+  font-size: 13px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: #fff;
+}
+.chat-input-row {
+  display: flex;
+  gap: 8px;
+}
+.chat-input-row input {
+  flex: 1;
+}
+.ws-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+.ws-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ws-item {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(23, 55, 76, 0.14);
+  background: rgba(255, 255, 255, 0.72);
+}
+.ws-item-main {
+  flex: 1;
+  min-width: 240px;
+}
+.ws-item-main h3 {
+  margin: 4px 0 6px;
+  font-size: 17px;
+}
+.task-check-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+  flex: 1;
+}
+.doc-preview {
+  white-space: pre-wrap;
+  font-family: inherit;
+  font-size: 13px;
+  background: rgba(23, 55, 76, 0.04);
+  padding: 10px;
+  border-radius: 8px;
+  max-height: 140px;
+  overflow-y: auto;
+  margin: 6px 0 0;
+}
+
+
+/* --- Demo Accounts Grid (AuthPage) --- */
+.demo-accounts-box {
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+.demo-accounts-head {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #896327;
+  margin-bottom: 10px;
+}
+.demo-accounts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
+}
+.demo-account-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(23, 55, 76, 0.18);
+  background: var(--surface);
+  text-align: left;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.1s ease;
+}
+.demo-account-btn:hover:not(:disabled) {
+  border-color: #a47730;
+  background: #f5ecda;
+  transform: translateY(-1px);
+}
+.demo-account-top {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+}
+.demo-account-top b {
+  font-size: 13px;
+  color: var(--ink);
+}
+.demo-account-badge {
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: var(--primary-soft);
+  color: #7c5821;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.demo-account-btn small {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+/* --- Google Drive Connection Strip (DiagnosePage & Workspace) --- */
+.drive-conn-strip {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding-bottom: 8px;
+  margin-bottom: 4px;
+  border-bottom: 1px dashed rgba(23, 55, 76, 0.16);
+}
+.drive-conn-info {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+}
+.drive-conn-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--solid);
+  display: inline-block;
+  box-shadow: 0 0 0 3px rgba(47, 114, 93, 0.18);
+}
+.ws-conn-bar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+.ws-conn-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* --- Passport Stamp Summary Filter Tiles --- */
+.pp-stamp-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  padding: 16px 24px 8px;
+  border-bottom: 1px solid #dfd6c3;
+  background: linear-gradient(180deg, rgba(238, 229, 209, 0.45), rgba(247, 243, 233, 0.2));
+}
+.pp-stat-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px 13px;
+  border-radius: 6px;
+  border: 1px solid #d8ceba;
+  background: rgba(255, 252, 245, 0.85);
+  text-align: left;
+  transition: all 0.15s ease;
+}
+.pp-stat-tile:hover {
+  border-color: #9e7a39;
+  background: #fffdf8;
+}
+.pp-stat-tile.on {
+  border-color: var(--navy);
+  background: var(--navy);
+  color: #f7f3e9;
+  box-shadow: 0 3px 10px rgba(23, 55, 76, 0.16);
+}
+.pp-stat-tile b {
+  font-family: var(--serif);
+  font-size: 24px;
+  line-height: 1.05;
+  color: var(--navy);
+}
+.pp-stat-tile span {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.pp-stat-tile small {
+  font-size: 10.5px;
+  color: var(--muted);
+}
+.pp-stat-tile.on b,
+.pp-stat-tile.on span,
+.pp-stat-tile.on small {
+  color: #f7f3e9;
+}
+.pp-stat-tile.completed b { color: var(--solid); }
+.pp-stat-tile.reentry b { color: var(--gap); }
+.pp-stat-tile.entry b { color: #b85b19; }
+.pp-stat-tile.progress b { color: var(--shaky); }
+.pp-stat-tile.on.completed b,
+.pp-stat-tile.on.reentry b,
+.pp-stat-tile.on.entry b,
+.pp-stat-tile.on.progress b {
+  color: var(--gold-accent);
+}
+
+/* --- Authentic Passport Visa Back-Page Design (No Ruled Lines) --- */
+.passport {
+  background-color: #f6efe0;
+  background-image:
+    radial-gradient(circle at 18% 22%, rgba(181, 133, 59, 0.06) 0%, transparent 45%),
+    radial-gradient(circle at 82% 76%, rgba(23, 55, 76, 0.05) 0%, transparent 50%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='80' viewBox='0 0 160 80'%3E%3Cpath d='M0 20 Q 40 4, 80 20 T 160 20' fill='none' stroke='%2317374c' stroke-width='0.55' stroke-opacity='0.055'/%3E%3Cpath d='M0 40 Q 40 24, 80 40 T 160 40' fill='none' stroke='%2394702d' stroke-width='0.55' stroke-opacity='0.06'/%3E%3Cpath d='M0 60 Q 40 44, 80 60 T 160 60' fill='none' stroke='%2317374c' stroke-width='0.55' stroke-opacity='0.055'/%3E%3C/svg%3E");
+  border: 2px solid #c5b89b;
+  border-radius: 10px;
+  box-shadow:
+    0 12px 32px rgba(23, 55, 76, 0.1),
+    inset 0 0 0 4px rgba(255, 252, 244, 0.65);
+}
+
+.pp-backpage {
+  position: relative;
+  margin: 18px 22px;
+  padding: 20px 22px 24px;
+  border-radius: 8px;
+  border: 1px solid #d5c7a9;
+  background-color: #faf4e6;
+  background-image:
+    radial-gradient(circle at 50% 50%, rgba(181, 133, 59, 0.05) 0%, transparent 62%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='60' viewBox='0 0 120 60'%3E%3Cpath d='M0 15 C 30 2, 90 28, 120 15' fill='none' stroke='%2317374c' stroke-width='0.5' stroke-opacity='0.06'/%3E%3Cpath d='M0 45 C 30 32, 90 58, 120 45' fill='none' stroke='%2394702d' stroke-width='0.5' stroke-opacity='0.065'/%3E%3C/svg%3E");
+  box-shadow:
+    inset 0 0 0 2px rgba(181, 133, 59, 0.14),
+    0 2px 6px rgba(23, 55, 76, 0.04);
+  overflow: hidden;
+}
+
+.pp-backpage-watermark {
+  position: absolute;
+  right: 28px;
+  bottom: 18px;
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  border: 2px double rgba(23, 55, 76, 0.065);
+  display: grid;
+  place-items: center;
+  font-family: var(--serif);
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: rgba(23, 55, 76, 0.055);
+  pointer-events: none;
+  user-select: none;
+  transform: rotate(-14deg);
+}
+
+.pp-backpage-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding-bottom: 10px;
+  margin-bottom: 14px;
+  border-bottom: 1px double #cebda0;
+}
+.pp-backpage-header h3 {
+  margin: 2px 0 0;
+  font-family: var(--serif);
+  font-size: 20px;
+  color: var(--navy);
+}
+.pp-backpage-code {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #896327;
+}
+.pp-backpage-num {
+  font-family: var(--serif);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #7a6a4f;
+  padding: 3px 9px;
+  border: 1px solid #d4c4a3;
+  border-radius: 3px;
+  background: rgba(255, 252, 245, 0.7);
+}
+
+/* --- Visa Boxes & Rubber-Ink Stamps --- */
+.visa {
+  position: relative;
+  min-height: 132px;
+  border: 1px solid #d7c9ad;
+  border-radius: 6px;
+  background: rgba(255, 253, 247, 0.86);
+  padding: 11px 13px 38px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+  transition: border-color 0.15s ease, transform 0.12s ease;
+}
+.visa:hover {
+  border-color: #b1935b;
+}
+.visa-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 6px;
+}
+.visa-code {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 10px;
+  color: #7d6f55;
+  background: rgba(23, 55, 76, 0.05);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+.visa.stamped {
+  border-color: #9ec4b0;
+  background: linear-gradient(155deg, rgba(255, 253, 247, 0.94), rgba(231, 243, 236, 0.65));
+}
+.visa.reentry {
+  border: 2px dashed var(--gap);
+  background: linear-gradient(155deg, rgba(255, 248, 245, 0.94), rgba(248, 232, 223, 0.72));
+}
+.visa-recheck-btn {
+  position: absolute;
+  left: 11px;
+  bottom: 9px;
+  z-index: 2;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 9px;
+  border-radius: 4px;
+  border: 1px solid var(--navy);
+  background: var(--surface);
+  color: var(--navy);
+  transition: all 0.14s ease;
+}
+.visa-recheck-btn:hover {
+  background: var(--navy);
+  color: var(--paper);
+}
+.visa.reentry .visa-recheck-btn,
+.visa.entry-required .visa-recheck-btn {
+  border-color: var(--gap);
+  color: var(--gap);
+  background: #fff;
+}
+.visa.reentry .visa-recheck-btn:hover,
+.visa.entry-required .visa-recheck-btn:hover {
+  background: var(--gap);
+  color: #fff;
+}
+
+.stamp.stamped {
+  border: 3px double var(--solid);
+  color: var(--solid);
+  background: radial-gradient(circle, rgba(237, 242, 232, 0.88) 0 62%, transparent 64%);
+  box-shadow: inset 0 0 0 1px rgba(47, 114, 93, 0.25);
+}
+.stamp.reentry {
+  width: 82px;
+  height: 82px;
+  border: 3px double var(--gap);
+  color: var(--gap);
+  transform: rotate(-8deg);
+  background: radial-gradient(circle, rgba(248, 232, 223, 0.9) 0 64%, transparent 66%);
+}
+
+/* --- Inline Passport Re-check Drawer --- */
+.pp-recheck-drawer {
+  margin: 14px 22px 18px;
+  padding: 18px 20px;
+  border-radius: 8px;
+  border: 2px solid var(--navy);
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgba(23, 55, 76, 0.12);
+}
+.pp-recheck-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 10px;
+}

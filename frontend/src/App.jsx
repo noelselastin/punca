@@ -7,10 +7,9 @@ import ResultPage from './pages/ResultPage.jsx'
 import PassportPage from './pages/PassportPage.jsx'
 import CirclesPage from './pages/CirclesPage.jsx'
 import HistoryPage from './pages/HistoryPage.jsx'
-import LecturerPage from './pages/LecturerPage.jsx'
 import LandingPage from './pages/LandingPage.jsx'
 import PassportSetupPage from './pages/PassportSetupPage.jsx'
-import MoodlePage from './pages/MoodlePage.jsx'
+import GoogleWorkspacePage from './pages/GoogleWorkspacePage.jsx'
 import Brand from './components/Brand.jsx'
 
 function parseHash() {
@@ -19,7 +18,11 @@ function parseHash() {
 }
 
 const STUDENT_NAV = [
-  ['passport', 'Passport'], ['moodle', 'APU Moodle'], ['diagnose', 'Diagnose'], ['circles', 'Study circles'], ['history', 'History'],
+  ['passport', 'Passport'],
+  ['diagnose', 'Diagnose'],
+  ['circles', 'Study circles'],
+  ['workspace', 'Google Workspace'],
+  ['history', 'History'],
 ]
 
 export default function App() {
@@ -50,8 +53,7 @@ export default function App() {
   const onAuthed = (token, u, isNew) => {
     setToken(token)
     setUser(u)
-    if (u.role === 'lecturer') go('lecturer')
-    else if (isNew || !(u.passportStyle && u.passportStyle.setupDone)) go('setup')
+    if (isNew || !(u.passportStyle && u.passportStyle.setupDone)) go('setup')
     else go('passport')
   }
 
@@ -69,20 +71,17 @@ export default function App() {
     return <LandingPage onStart={() => go('join')} onSignIn={() => go('signin')} />
   }
 
-  const isLecturer = user.role === 'lecturer'
   if (route.page === 'home') {
-    return <LandingPage user={user} onStart={() => go(isLecturer ? 'lecturer' : 'passport')} onSignIn={() => {}} />
+    return <LandingPage user={user} onStart={() => go('passport')} onSignIn={() => {}} />
   }
-  let page = route.page || (isLecturer ? 'lecturer' : 'passport')
-  if (isLecturer) page = 'lecturer'
+  const page = route.page || 'passport'
 
   let body
   if (!catalog) body = <div className="card"><p>Loading the concept catalog. If this stays here, check that the backend is running.</p></div>
-  else if (isLecturer) body = <LecturerPage catalog={catalog} />
   else if (page === 'setup') body = <PassportSetupPage user={user} catalog={catalog} onUser={setUser} />
   else if (page === 'diagnosis') body = <ResultPage id={route.id} catalog={catalog} user={user} onUser={setUser} />
   else if (page === 'passport') body = <PassportPage key={route.id || 'pp'} catalog={catalog} user={user} onUser={setUser} welcome={route.id === 'welcome'} />
-  else if (page === 'moodle') body = <MoodlePage user={user} onUser={setUser} onDiagnosePrompt={setDiagnosePrefill} />
+  else if (page === 'workspace') body = <GoogleWorkspacePage user={user} onUser={setUser} onDiagnoseFile={setDiagnosePrefill} />
   else if (page === 'circles') body = <CirclesPage user={user} onUser={setUser} />
   else if (page === 'history') body = <HistoryPage />
   else body = <DiagnosePage prefill={diagnosePrefill} onClearPrefill={() => setDiagnosePrefill(null)} />
@@ -93,11 +92,9 @@ export default function App() {
       <header className="topbar">
         <Brand href="#/home" title="About Punca" />
         <nav>
-          {isLecturer
-            ? <a className="active" href="#/lecturer">Lecturer dashboard</a>
-            : STUDENT_NAV.map(([p, label]) => (
-              <a key={p} href={`#/${p}`} className={page === p || (p === 'diagnose' && page === 'diagnosis') || (p === 'passport' && page === 'setup') ? 'active' : ''}>{label}</a>
-            ))}
+          {STUDENT_NAV.map(([p, label]) => (
+            <a key={p} href={`#/${p}`} className={page === p || (p === 'diagnose' && page === 'diagnosis') || (p === 'passport' && page === 'setup') ? 'active' : ''}>{label}</a>
+          ))}
         </nav>
         <div className="topbar-right">
           {llm && (
@@ -105,7 +102,7 @@ export default function App() {
               {llm.mode === 'offline' ? 'Offline mode' : `Gemini · ${llm.model}`}
             </span>
           )}
-          <span className="who">{user.name}<small>{isLecturer ? 'Lecturer' : 'Student'}</small></span>
+          <span className="who">{user.name}<small>Student</small></span>
           <button className="btn ghost small" onClick={signOut}>Sign out</button>
         </div>
       </header>

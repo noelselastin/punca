@@ -28,30 +28,31 @@ def _flag(name: str, default: str = "false") -> bool:
 
 # --- LLM -------------------------------------------------------------------------------------
 # Pinned model ID (README section 9: never use -latest aliases).
-# Free-tier limits seen in AI Studio (9 Nov 2026): Flash-Lite models allow 15 requests/minute and 500/day each;
-# gemini-3.8-flash allows only 5/minute and 20/day, too few for an app. So Flash-Lite is the default.
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite").strip()
-# Pinned fallbacks, tried in order when a model is overloaded (503), rate-limited (429) or times out (504).
 GEMINI_FALLBACK_MODELS = [m.strip() for m in os.getenv("GEMINI_FALLBACK_MODELS", "gemini-3.1-flash-lite").split(",") if m.strip()]
-LLM_COOLDOWN_S = int(os.getenv("LLM_COOLDOWN_S", "60"))          # skip a busy / per-minute-limited model
-LLM_DAILY_COOLDOWN_S = int(os.getenv("LLM_DAILY_COOLDOWN_S", "3600"))  # after a per-day quota error
-# README section 10: a Flash-Lite model may be used for routing (mapping a stuck point to a concept).
+LLM_COOLDOWN_S = int(os.getenv("LLM_COOLDOWN_S", "60"))
+LLM_DAILY_COOLDOWN_S = int(os.getenv("LLM_DAILY_COOLDOWN_S", "3600"))
 GEMINI_ROUTING_MODEL = os.getenv("GEMINI_ROUTING_MODEL", GEMINI_MODEL).strip()
-# Free tier: an API key from Google AI Studio (no billing needed).
 GEMINI_API_KEY = (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or "").strip()
-# Vertex AI (needs a Google Cloud project with billing or credits): USE_VERTEX=true + GCP_PROJECT.
 USE_VERTEX = _flag("USE_VERTEX")
 GCP_PROJECT = os.getenv("GCP_PROJECT", "").strip()
 GCP_REGION = os.getenv("GCP_REGION", "global").strip()
-# Force the deterministic offline mode (no LLM calls), e.g. for tests and the eval baseline.
 PUNCA_OFFLINE = _flag("PUNCA_OFFLINE")
 LLM_TIMEOUT_MS = int(os.getenv("LLM_TIMEOUT_MS", "20000"))
+
+# --- Google Workspace (live sign-in) ---------------------------------------------------------
+# OAuth client ID (type "Web application") from Google Cloud Console. Empty = live Google sign-in
+# is off and Punca uses its built-in workspace store. See docs/google-setup.md.
+GOOGLE_OAUTH_CLIENT_ID = os.getenv("GOOGLE_OAUTH_CLIENT_ID", "").strip()
+# Time zone used for Calendar events whose start time has no UTC offset.
+PUNCA_TIMEZONE = os.getenv("PUNCA_TIMEZONE", "Asia/Kuala_Lumpur").strip() or "Asia/Kuala_Lumpur"
 
 # --- Storage ---------------------------------------------------------------------------------
 STORE_PATH = Path(os.getenv("PUNCA_STORE", str(VAR_DIR / "store.json")))
 
-# --- Diagnosis (README section 8) ------------------------------------------------------------
-MAX_PROBES = int(os.getenv("PUNCA_MAX_PROBES", "5"))
+# --- Diagnosis (5-10 confidence-weighted questions) ------------------------------------------
+MIN_PROBES = int(os.getenv("PUNCA_MIN_PROBES", "5"))
+MAX_PROBES = int(os.getenv("PUNCA_MAX_PROBES", "10"))
 SOLID = 0.7      # pKnown at or above this = solid (green)
 GAP = 0.4        # pKnown below this = gap (red); in between = shaky (amber)
 P_INIT = 0.5     # prior pKnown for an untested concept
@@ -59,7 +60,6 @@ P_GUESS = 0.25   # four-option multiple choice
 P_SLIP = 0.1
 P_LEARN = 0.05
 
-# --- Circles and lecturer analytics (README sections 10 and 11) -----------------------------
+# --- Study Circles ---------------------------------------------------------------------------
 MIN_GROUP_SIZE = 3
 MAX_GROUP_SIZE = 6
-MIN_COUNT_SHOWN = 3   # aggregates below this are hidden from lecturers

@@ -1,27 +1,36 @@
-"""Application logic behind the HTTP API. Routes in api/main.py stay thin and call PuncaService."""
+"""Application logic behind the HTTP API. Routes in api/factory.py stay thin and call PuncaService."""
 from __future__ import annotations
 
 import logging
 import re
 import uuid
-from collections import Counter, defaultdict
+from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
 import auth
 import config
-import moodle
+import google_workspace as gws
 from content import Catalog
 from diagnosis import bkt
 from diagnosis.engine import DiagnosisEngine, DiagnosisError, Params
+from google_live import SCOPES as GOOGLE_SCOPES, GoogleLive, GoogleLiveError
 from llm.service import LLMService
 from scheduling import circles as sched
 from store.local_store import LocalStore
 
 log = logging.getLogger("punca.api")
 
-
 PASSPORT_COVERS = ["navy", "maroon", "forest", "teal", "plum"]
 PASSPORT_EMBLEMS = ["spring", "compass", "atom", "leaf", "star"]
+
+ALL_AREAS_ORDER = [
+    "Maths Foundations (pre-university)",
+    "Computing & Programming Foundations",
+    "Computational Mathematics",
+    "Introduction to Python",
+    "Object Oriented Programming with Java",
+    "Introduction to Databases",
+]
 
 
 class ServiceError(Exception):
@@ -54,28 +63,61 @@ class StoreMastery:
         return (d["pKnown"], d["evidenceCount"]) if d else (config.P_INIT, 0)
 
     def set(self, cid: str, p: float, ev: int, **extra) -> None:
-        self.store.put("mastery", f"{self.uid}_{cid}", {"uid": self.uid, "conceptId": cid, "pKnown": round(p, 4),
-                                                        "evidenceCount": ev, "lastUpdated": _iso(), **extra})
+        self.store.put(
+            "mastery",
+            f"{self.uid}_{cid}",
+            {
+                "uid": self.uid,
+                "conceptId": cid,
+                "pKnown": round(p, 4),
+                "evidenceCount": ev,
+                "lastUpdated": _iso(),
+                **extra,
+            },
+        )
 
 
 class PuncaService:
-    def __init__(self, catalog: Catalog, store: LocalStore, llm: LLMService, params: Params | None = None):
+    def __init__(
+        self,
+        catalog: Catalog,
+        store: LocalStore,
+        llm: LLMService,
+        params: Params | None = None,
+        live: GoogleLive | None = None,
+    ):
         self.cat = catalog
         self.store = store
         self.llm = llm
         self.params = params or Params()
+        self.live = live or GoogleLive()
         self.engine = DiagnosisEngine(catalog.graph, catalog.probes, catalog.probes_by_concept, self.params)
 
     # ================================================================== accounts ============
     @staticmethod
     def public_user(u: dict) -> dict:
-        mc = u.get("moodleConnection") or {}
-        return {k: u.get(k) for k in ("uid", "role", "name", "email", "university", "studentId", "programme", "year", "department",
-                                      "availability", "consent", "createdAt", "passportStyle")} | {
+        ws = u.get("googleWorkspace") or {}
+        return {
+            k: u.get(k)
+            for k in (
+                "uid",
+                "role",
+                "name",
+                "email",
+                "university",
+                "studentId",
+                "programme",
+                "year",
+                "availability",
+                "consent",
+                "createdAt",
+                "passportStyle",
+            )
+        } | {
             "demoAccount": u.get("demoAccount", False),
-            "moodleConnected": bool(mc.get("syncedAt")),
-            "moodleSite": mc.get("siteName"),
-            "moodleMode": mc.get("mode"),
+            "googleConnected": bool(ws.get("connected", True)),
+            "googleEmail": ws.get("email") or u.get("email"),
+            "googleLive": ws.get("mode") == "oauth-live",
         }
 
     def _user_by_email(self, email: str) -> dict | None:
@@ -85,12 +127,19 @@ class PuncaService:
 
     def _issue_token(self, uid: str) -> str:
         token = auth.new_token()
-        self.store.put("authTokens", auth.token_key(token), {
-            "uid": uid, "createdAt": _iso(), "expiresAt": _iso(_now() + timedelta(days=auth.TOKEN_TTL_DAYS))})
+        self.store.put(
+            "authTokens",
+            auth.token_key(token),
+            {
+                "uid": uid,
+                "createdAt": _iso(),
+                "expiresAt": _iso(_now() + timedelta(days=auth.TOKEN_TTL_DAYS)),
+            },
+        )
         return token
 
     def signup(self, data: dict) -> dict:
-        """Student sign-up. Lecturer accounts are not created through the app (the demo has one staff login)."""
+        """Student sign-up."""
         role = "student"
         name = (data.get("name") or "").strip()
         email = (data.get("email") or "").strip().lower()
@@ -101,7 +150,13 @@ class PuncaService:
         if not 2 <= len(name) <= 60:
             raise ServiceError(400, "Enter your name (2 to 60 characters).")
         if not auth.valid_email(email):
-            raise ServiceError(400, "Enter a valid university email address.")
+            raise ServiceError(400, "Enter a valid personal Gmail address.")
+        if not auth.is_personal_gmail(email):
+            raise ServiceError(
+                400,
+                "Use your personal Gmail address (ending in @gmail.com), not your university email. "
+                "Punca connects Google Drive, Calendar and Tasks to it.",
+            )
         if len(password) < 8 or len(password) > 128:
             raise ServiceError(400, "Use a password of at least 8 characters.")
         if password != data.get("confirmPassword"):
@@ -109,7 +164,10 @@ class PuncaService:
         if not 2 <= len(university) <= 120:
             raise ServiceError(400, "Enter your university (2 to 120 characters).")
         if not re.fullmatch(r"[A-Z0-9][A-Z0-9._/-]{0,39}", student_id):
-            raise ServiceError(400, "Enter a student ID of up to 40 letters or numbers. Dots, hyphens, underscores and slashes are allowed.")
+            raise ServiceError(
+                400,
+                "Enter a student ID of up to 40 letters or numbers. Dots, hyphens, underscores and slashes are allowed.",
+            )
         if not 2 <= len(course) <= 80:
             raise ServiceError(400, "Enter your course (2 to 80 characters).")
         extra: dict = {"programme": course, "university": university, "studentId": student_id}
@@ -123,13 +181,26 @@ class PuncaService:
                 raise ServiceError(400, "Year of study must be a number from 1 to 5.")
             extra["year"] = year
         uid = "u-" + uuid.uuid4().hex[:12]
-        user = {"uid": uid, "role": role, "name": name, "email": email,
-                "passwordHash": auth.hash_password(password), "programme": None, "year": None,
-                "department": None, "courseIds": [self.cat.course["id"]], "availability": [],
-                "consent": {"joinCircles": False, "shareNameWithCircle": False, "shareNameWithLecturer": False,
-                            "sharePassport": False},
-                "synthetic": False, "createdAt": _iso()}
+        user = {
+            "uid": uid,
+            "role": role,
+            "name": name,
+            "email": email,
+            "passwordHash": auth.hash_password(password),
+            "programme": None,
+            "year": None,
+            "courseIds": [self.cat.course["id"]],
+            "availability": [],
+            "consent": {
+                "joinCircles": False,
+                "shareNameWithCircle": False,
+                "sharePassport": False,
+            },
+            "synthetic": False,
+            "createdAt": _iso(),
+        }
         user.update(extra)
+        gws.ensure_workspace(user)
         conflict = self.store.create_user(user)
         if conflict == "email":
             raise ServiceError(409, "An account with that email already exists. Sign in instead.")
@@ -142,6 +213,9 @@ class PuncaService:
         user = self._user_by_email(email or "")
         if not user or not auth.verify_password(password or "", user.get("passwordHash")):
             raise ServiceError(401, "Email or password is not correct.")
+        if "googleWorkspace" not in user:
+            gws.ensure_workspace(user)
+            self.store.put("users", user["uid"], user)
         return {"token": self._issue_token(user["uid"]), "user": self.public_user(user)}
 
     def logout(self, token: str) -> None:
@@ -179,7 +253,7 @@ class PuncaService:
                 raise ServiceError(400, "Availability must be a list of slots such as 'Tue-14'.")
             user["availability"] = sorted(set(slots), key=sched.ALL_SLOTS.index)
         if "consent" in data:
-            for k in ("joinCircles", "shareNameWithCircle", "shareNameWithLecturer", "sharePassport"):
+            for k in ("joinCircles", "shareNameWithCircle", "sharePassport"):
                 if k in (data["consent"] or {}):
                     user["consent"][k] = bool(data["consent"][k])
             if "sharePassport" in (data["consent"] or {}):
@@ -190,16 +264,23 @@ class PuncaService:
         return self.public_user(user)
 
     def _passport_style(self, user: dict, p: dict) -> dict:
-        """Validate passport customisation: cover colour, emblem, name on the passport, motto, labs in focus."""
+        """Validate passport customisation: cover colour, user photo, display name, motto, preset & custom labs."""
         cur = dict(user.get("passportStyle") or {})
         if "cover" in p:
             if p["cover"] not in PASSPORT_COVERS:
                 raise ServiceError(400, "Pick one of the passport cover colours.")
             cur["cover"] = p["cover"]
-        if "emblem" in p:
-            if p["emblem"] not in PASSPORT_EMBLEMS:
-                raise ServiceError(400, "Pick one of the passport emblems.")
+        if "emblem" in p and p["emblem"] in PASSPORT_EMBLEMS:
             cur["emblem"] = p["emblem"]
+        if "photoUrl" in p:
+            photo = p["photoUrl"]
+            if not photo:
+                cur["photoUrl"] = None
+            elif isinstance(photo, str):
+                photo = photo.strip()
+                if len(photo) > 500_000:
+                    raise ServiceError(400, "Passport photo is too large. Please choose an image under 350 KB.")
+                cur["photoUrl"] = photo
         if "displayName" in p:
             name = (p["displayName"] or "").strip()
             if not 2 <= len(name) <= 40:
@@ -210,11 +291,24 @@ class PuncaService:
         if "focusLabIds" in p:
             labs = {lab["id"] for lab in self.cat.labs}
             cur["focusLabIds"] = [x for x in (p["focusLabIds"] or []) if x in labs]
+        if "customLabs" in p:
+            raw_custom = p.get("customLabs") or []
+            if not isinstance(raw_custom, list):
+                raise ServiceError(400, "customLabs must be a list of lab names.")
+            cleaned_custom: list[str] = []
+            for item in raw_custom[:15]:
+                if isinstance(item, str):
+                    txt = item.strip()[:80]
+                    if txt and txt not in cleaned_custom:
+                        cleaned_custom.append(txt)
+            cur["customLabs"] = cleaned_custom
         cur.setdefault("cover", PASSPORT_COVERS[0])
         cur.setdefault("emblem", PASSPORT_EMBLEMS[0])
+        cur.setdefault("photoUrl", None)
         cur.setdefault("displayName", user["name"])
         cur.setdefault("motto", None)
         cur.setdefault("focusLabIds", [])
+        cur.setdefault("customLabs", [])
         cur["setupDone"] = True
         return cur
 
@@ -222,9 +316,12 @@ class PuncaService:
     def mastery_map(self, uid: str) -> dict:
         out = {}
         for d in self.store.list("mastery", lambda m: m["uid"] == uid):
-            out[d["conceptId"]] = {"pKnown": d["pKnown"], "evidenceCount": d["evidenceCount"],
-                                   "status": bkt.status(d["pKnown"], d["evidenceCount"]),
-                                   "selfReported": d.get("selfReported", False)}
+            out[d["conceptId"]] = {
+                "pKnown": d["pKnown"],
+                "evidenceCount": d["evidenceCount"],
+                "status": bkt.status(d["pKnown"], d["evidenceCount"]),
+                "selfReported": d.get("selfReported", False),
+            }
         return out
 
     def mark_known(self, uid: str, cid: str) -> dict:
@@ -236,19 +333,126 @@ class PuncaService:
         log.info("uid=%s corrected %s to known", uid, cid)
         return self.mastery_map(uid)
 
+    @staticmethod
+    def _stamp_slipped(cid: str, mastery: dict) -> bool:
+        """A completed stamp needs re-entry once later answers pull the concept back below solid."""
+        m = mastery.get(cid)
+        return bool(m) and m["pKnown"] < config.SOLID
+
+    def _concept_passport_state(self, cid: str, mastery: dict, stamps: dict) -> str:
+        st = stamps.get(cid)
+        if st:
+            return "reentry" if self._stamp_slipped(cid, mastery) else "stamped"
+        m = mastery.get(cid)
+        if m and m["status"] == "gap":
+            return "entry-required"
+        if m and m["status"] in ("shaky", "solid"):
+            return m["status"]
+        return "untested"
+
     # ================================================================== diagnosis ===========
-    def map_stuck(self, text: str) -> dict:
+    def _assess_required_foundations(self, uid: str, combined_text: str, target_cid: str | None) -> list[dict]:
+        """Identify the 5–8 foundational concepts required by the written brief + uploaded document."""
+        mastery = self.mastery_map(uid)
+        stamps = {s["conceptId"]: s for s in self.store.list("stamps", lambda s: s["uid"] == uid)}
+        hits = self.cat.search_concepts(combined_text, k=6)
+        ordered_ids: list[str] = []
+        if target_cid and target_cid in self.cat.concepts:
+            ordered_ids.append(target_cid)
+        for h in hits:
+            if h["conceptId"] not in ordered_ids:
+                ordered_ids.append(h["conceptId"])
+        # Add direct and secondary prerequisites of top matched concepts so foundations are covered
+        for cid in list(ordered_ids[:3]):
+            for pre in self.cat.graph.prereqs(cid):
+                if pre not in ordered_ids:
+                    ordered_ids.append(pre)
+            for anc in self.cat.graph.ancestors(cid):
+                if anc not in ordered_ids and len(ordered_ids) < 8:
+                    ordered_ids.append(anc)
+        foundations: list[dict] = []
+        for cid in ordered_ids[:8]:
+            c = self.cat.concepts[cid]
+            foundations.append({
+                "conceptId": cid,
+                "name": c["name"],
+                "area": c["area"],
+                "description": c["description"],
+                "state": self._concept_passport_state(cid, mastery, stamps),
+                "isTarget": cid == target_cid,
+            })
+        return foundations
+
+    def map_stuck(self, user: dict, text: str, file_data: dict | None = None) -> dict:
         text = (text or "").strip()
-        if not 3 <= len(text) <= 2000:
-            raise ServiceError(400, "Describe what you are stuck on in 3 to 2000 characters.")
-        m = self.llm.map_stuck_point(text)
-        m["targetName"] = self.cat.name(m.get("targetConceptId"))
+        file_data = file_data or {}
+        doc_summary = None
+        extracted_doc_text = ""
+
+        # Check if a Google Drive file or PC file upload was attached
+        drive_file_id = (file_data.get("driveFileId") or "").strip()
+        file_name = (file_data.get("fileName") or "").strip()
+        file_b64 = file_data.get("fileBase64")
+        file_text = file_data.get("fileText")
+
+        if drive_file_id:
+            ws = gws.ensure_workspace(user)
+            dfile = next((f for f in ws.get("driveFiles", []) if f["id"] == drive_file_id), None)
+            if not dfile:
+                raise ServiceError(404, "Selected Google Drive file was not found.")
+            extracted_doc_text = dfile.get("content") or dfile.get("summary") or dfile["name"]
+            doc_summary = {
+                "source": "google-drive",
+                "fileId": dfile["id"],
+                "fileName": dfile["name"],
+                "summary": dfile.get("summary") or extracted_doc_text[:300],
+                "wordCount": len(re.findall(r"\S+", extracted_doc_text)),
+                "webViewLink": dfile.get("webViewLink"),
+                "live": bool(dfile.get("live")),
+            }
+        elif file_name or file_b64 or file_text:
+            try:
+                parsed = gws.extract_document_text(file_name or "uploaded-brief.txt", file_b64, file_text)
+            except gws.WorkspaceError as exc:
+                raise ServiceError(exc.status, exc.message) from exc
+            extracted_doc_text = parsed["text"]
+            doc_summary = {
+                "source": "pc-upload",
+                "fileName": parsed["filename"],
+                "summary": parsed["summary"],
+                "wordCount": parsed["wordCount"],
+            }
+            if file_data.get("saveToDrive"):
+                saved, warn = self._drive_save(
+                    user,
+                    parsed,
+                    raw_bytes=gws.decode_upload(file_b64),
+                    mime_type=file_data.get("mimeType"),
+                )
+                doc_summary["driveFileId"] = saved["id"]
+                doc_summary["webViewLink"] = saved.get("webViewLink")
+                doc_summary["live"] = saved.get("live", False)
+                if warn:
+                    doc_summary["warning"] = warn
+
+        combined = f"{text}\n\n{extracted_doc_text}".strip()
+        if not 3 <= len(combined) <= 15000:
+            raise ServiceError(400, "Describe what you are stuck on or attach a lab/question document (at least 3 characters).")
+        m = self.llm.map_stuck_point(combined[:2500])
+        target_cid = m.get("targetConceptId")
+        m["targetName"] = self.cat.name(target_cid)
+        foundations = self._assess_required_foundations(user["uid"], combined, target_cid)
+        m["requiredFoundations"] = foundations
+        m["requiredFoundationIds"] = [f["conceptId"] for f in foundations]
+        m["documentSummary"] = doc_summary
         return m
 
     def _used_probes(self, uid: str) -> list[str]:
         used: list[str] = []
-        for d in sorted(self.store.list("diagnoses", lambda x: x["uid"] == uid and "state" in x),
-                        key=lambda x: x["createdAt"]):
+        for d in sorted(
+            self.store.list("diagnoses", lambda x: x["uid"] == uid and "state" in x),
+            key=lambda x: x["createdAt"],
+        ):
             used += d["state"]["usedProbeIds"]
         return used
 
@@ -256,16 +460,43 @@ class PuncaService:
         if user["role"] != "student":
             raise ServiceError(403, "Only student accounts can run a diagnosis.")
         text = (text or "").strip()
-        if not 3 <= len(text) <= 2000:
-            raise ServiceError(400, "Describe what you are stuck on in 3 to 2000 characters.")
+        mapping = mapping or {}
+        doc_summary = mapping.get("documentSummary")
+        if not text and doc_summary:
+            text = f"Uploaded file: {doc_summary.get('fileName')} — {doc_summary.get('summary', '')}"[:1800]
+        if not 3 <= len(text) <= 4000:
+            raise ServiceError(400, "Describe what you are stuck on in 3 to 4000 characters.")
         if target not in self.cat.concepts:
             raise ServiceError(400, "Pick a concept from the list.")
-        state = self.engine.new_state(target, self._used_probes(user["uid"])[-40:])
+        focus_concepts = mapping.get("requiredFoundationIds") or [
+            f["conceptId"] for f in (mapping.get("requiredFoundations") or []) if isinstance(f, dict) and "conceptId" in f
+        ]
+        if not focus_concepts:
+            foundations = self._assess_required_foundations(user["uid"], text, target)
+            focus_concepts = [f["conceptId"] for f in foundations]
+            mapping["requiredFoundations"] = foundations
+            mapping["requiredFoundationIds"] = focus_concepts
+
+        state = self.engine.new_state(
+            target,
+            self._used_probes(user["uid"])[-40:],
+            focus_concepts=focus_concepts,
+        )
         self.engine.start(state, StoreMastery(self.store, user["uid"]))
         did = "d-" + uuid.uuid4().hex[:12]
-        doc = {"id": did, "uid": user["uid"], "courseId": self.cat.course["id"], "stuckInput": text,
-               "targetConceptId": target, "mapping": mapping or {}, "state": state, "status": state["status"],
-               "rootCauseConceptId": None, "path": [], "createdAt": _iso()}
+        doc = {
+            "id": did,
+            "uid": user["uid"],
+            "courseId": self.cat.course["id"],
+            "stuckInput": text,
+            "targetConceptId": target,
+            "mapping": mapping,
+            "state": state,
+            "status": state["status"],
+            "rootCauseConceptId": None,
+            "path": [],
+            "createdAt": _iso(),
+        }
         self._finish_if_done(doc)
         self.store.put("diagnoses", did, doc)
         return self.diagnosis_view(doc)
@@ -280,10 +511,17 @@ class PuncaService:
             doc["confidence"] = res["confidence"]
             doc["completedAt"] = _iso()
             if res["rootCauseConceptId"]:
-                self.store.put("diagnosisEvents", "ev-" + uuid.uuid4().hex[:10], {
-                    "courseId": doc["courseId"], "labId": self.cat.lab_for(doc["targetConceptId"]),
-                    "targetConceptId": doc["targetConceptId"], "rootCauseConceptId": res["rootCauseConceptId"],
-                    "timestamp": _iso()})
+                self.store.put(
+                    "diagnosisEvents",
+                    "ev-" + uuid.uuid4().hex[:10],
+                    {
+                        "courseId": doc["courseId"],
+                        "labId": self.cat.lab_for(doc["targetConceptId"]),
+                        "targetConceptId": doc["targetConceptId"],
+                        "rootCauseConceptId": res["rootCauseConceptId"],
+                        "timestamp": _iso(),
+                    },
+                )
 
     def _own_diagnosis(self, uid: str, did: str) -> dict:
         doc = self.store.get("diagnoses", did)
@@ -291,10 +529,16 @@ class PuncaService:
             raise ServiceError(404, "Diagnosis not found.")
         return doc
 
-    def answer(self, uid: str, did: str, probe_id: str, choice: int) -> dict:
+    def answer(self, uid: str, did: str, probe_id: str, choice: int, confidence: str = "medium") -> dict:
         doc = self._own_diagnosis(uid, did)
         try:
-            fb = self.engine.answer(doc["state"], probe_id, choice, StoreMastery(self.store, uid))
+            fb = self.engine.answer(
+                doc["state"],
+                probe_id,
+                choice,
+                StoreMastery(self.store, uid),
+                confidence=confidence,
+            )
         except DiagnosisError as exc:
             raise ServiceError(409, str(exc))
         fb["conceptName"] = self.cat.name(fb["conceptId"])
@@ -307,12 +551,25 @@ class PuncaService:
         return self.diagnosis_view(self._own_diagnosis(uid, did))
 
     def list_diagnoses(self, uid: str) -> list[dict]:
-        docs = sorted(self.store.list("diagnoses", lambda d: d["uid"] == uid and "state" in d),
-                      key=lambda d: d["createdAt"], reverse=True)
-        return [{"id": d["id"], "stuckInput": d["stuckInput"], "status": d["status"], "createdAt": d["createdAt"],
-                 "targetConceptId": d["targetConceptId"], "targetName": self.cat.name(d["targetConceptId"]),
-                 "rootCauseConceptId": d.get("rootCauseConceptId"),
-                 "rootCauseName": self.cat.name(d.get("rootCauseConceptId"))} for d in docs]
+        docs = sorted(
+            self.store.list("diagnoses", lambda d: d["uid"] == uid and "state" in d),
+            key=lambda d: d["createdAt"],
+            reverse=True,
+        )
+        return [
+            {
+                "id": d["id"],
+                "stuckInput": d["stuckInput"],
+                "status": d["status"],
+                "createdAt": d["createdAt"],
+                "targetConceptId": d["targetConceptId"],
+                "targetName": self.cat.name(d["targetConceptId"]),
+                "rootCauseConceptId": d.get("rootCauseConceptId"),
+                "rootCauseName": self.cat.name(d.get("rootCauseConceptId")),
+                "probesAsked": len((d.get("state") or {}).get("asked") or []),
+            }
+            for d in docs
+        ]
 
     def diagnosis_view(self, doc: dict) -> dict:
         st = doc["state"]
@@ -322,22 +579,53 @@ class PuncaService:
         asked = []
         for a in st["asked"]:
             p = self.cat.probes[a["probeId"]]
-            asked.append({"probeId": a["probeId"], "conceptId": a["conceptId"], "conceptName": self.cat.name(a["conceptId"]),
-                          "question": p["question"], "yourAnswer": p["options"][a["choiceIndex"]],
-                          "correctAnswer": p["options"][p["correctIndex"]], "correct": a["correct"],
-                          "misconception": a["misconception"], "misconceptionLabel": _label(a["misconception"])})
+            asked.append({
+                "probeId": a["probeId"],
+                "conceptId": a["conceptId"],
+                "conceptName": self.cat.name(a["conceptId"]),
+                "question": p["question"],
+                # Answers stored before the option order was mixed have no choiceText and
+                # point into the written order.
+                "yourAnswer": a.get("choiceText") or p.get("originalOptions", p["options"])[a["choiceIndex"]],
+                "correctAnswer": p["options"][p["correctIndex"]],
+                "correct": a["correct"],
+                "confidence": a.get("confidence", "medium"),
+                "highConfidenceGap": a.get("highConfidenceGap", False),
+                "luckyGuess": a.get("luckyGuess", False),
+                "misconception": a["misconception"],
+                "misconceptionLabel": _label(a["misconception"]),
+            })
         result = None
         if st.get("result"):
             r = st["result"]
             named = lambda ids: [{"id": c, "name": self.cat.name(c)} for c in ids]  # noqa: E731
-            result = dict(r, targetName=self.cat.name(r["targetConceptId"]),
-                          rootCauseName=self.cat.name(r["rootCauseConceptId"]),
-                          path=named(r["remediationPath"]), otherGapsNamed=named(r["otherGaps"]),
-                          untestedNamed=named(r["untestedPrerequisites"]), skippedSolidNamed=named(r["skippedSolid"]))
-        return {"id": doc["id"], "stuckInput": doc["stuckInput"], "status": st["status"],
-                "targetConceptId": doc["targetConceptId"], "targetName": self.cat.name(doc["targetConceptId"]),
-                "mapping": doc.get("mapping") or {}, "probesAsked": len(st["asked"]), "maxProbes": st["maxProbes"],
-                "pending": pending, "asked": asked, "result": result, "createdAt": doc["createdAt"]}
+            root_id = r.get("rootCauseConceptId")
+            related_ids = self.cat.graph.related(root_id) if root_id and root_id in self.cat.concepts else []
+            result = dict(
+                r,
+                targetName=self.cat.name(r["targetConceptId"]),
+                rootCauseName=self.cat.name(root_id),
+                path=named(r["remediationPath"]),
+                otherGapsNamed=named(r["otherGaps"]),
+                untestedNamed=named(r["untestedPrerequisites"]),
+                skippedSolidNamed=named(r["skippedSolid"]),
+                relatedNamed=named(related_ids),
+            )
+        return {
+            "id": doc["id"],
+            "stuckInput": doc["stuckInput"],
+            "status": st["status"],
+            "targetConceptId": doc["targetConceptId"],
+            "targetName": self.cat.name(doc["targetConceptId"]),
+            "mapping": doc.get("mapping") or {},
+            "probesAsked": len(st["asked"]),
+            "minProbes": st.get("minProbes", self.params.min_probes),
+            "maxProbes": st["maxProbes"],
+            "pending": pending,
+            "asked": asked,
+            "result": result,
+            "createdAt": doc["createdAt"],
+        }
 
     # ================================================================== remediation =========
     def remediation(self, uid: str, did: str) -> dict:
@@ -360,8 +648,13 @@ class PuncaService:
         for cid in path:
             for p in self.cat.probes_by_concept.get(cid, []):
                 if p["id"] not in exclude and len(out) < n:
-                    out.append(dict(self.cat.public_probe(p), correctIndex=p["correctIndex"],
-                                    explanation=p.get("explanation", "")))
+                    out.append(
+                        dict(
+                            self.cat.public_probe(p),
+                            correctIndex=p["correctIndex"],
+                            explanation=p.get("explanation", ""),
+                        )
+                    )
             if len(out) >= n:
                 break
         return out
@@ -395,101 +688,190 @@ class PuncaService:
         cid = pend["conceptId"]
         p, ev = book.get(cid)
         correct = choice == probe["correctIndex"]
-        p2 = bkt.update(p, correct, self.params.p_guess, self.params.p_slip, self.params.p_learn)
+        prior = max(p, 0.15) if correct else p
+        p2 = bkt.update(prior, correct, self.params.p_guess, self.params.p_slip, self.params.p_learn)
         book.set(cid, p2, ev + 1)
         user.pop("pendingRecheck", None)
         user.setdefault("lastRecheck", {})[cid] = probe_id
         self.store.put("users", user["uid"], user)
-        stamp, earned = self.store.get("stamps", f"{user['uid']}_{cid}"), False
-        # Passport rule: a stamp is earned only on a passed re-check, never by the first diagnosis.
+        stamp, earned, renewed = self.store.get("stamps", f"{user['uid']}_{cid}"), False, False
         if p2 >= config.SOLID and not stamp:
-            stamp = {"uid": user["uid"], "conceptId": cid, "tier": "verified", "earnedAt": _iso(),
-                     "basedOnDiagnosisId": self._diagnosis_touching(user["uid"], cid), "endorsedByUid": None,
-                     "endorsedAt": None, "shareable": bool(user["consent"].get("sharePassport"))}
+            stamp = {
+                "uid": user["uid"],
+                "conceptId": cid,
+                "tier": "completed",
+                "earnedAt": _iso(),
+                "basedOnDiagnosisId": self._diagnosis_touching(user["uid"], cid),
+                "shareable": bool(user["consent"].get("sharePassport")),
+            }
             self.store.put("stamps", f"{user['uid']}_{cid}", stamp)
             earned = True
-            log.info("uid=%s earned a verified stamp for %s", user["uid"], cid)
-        return {"correct": correct, "correctIndex": probe["correctIndex"], "explanation": probe.get("explanation", ""),
-                "conceptId": cid, "conceptName": self.cat.name(cid), "pKnown": round(p2, 4),
-                "status": bkt.status(p2, ev + 1), "stampEarned": earned, "stamp": stamp}
+            log.info("uid=%s completed a stamp for %s", user["uid"], cid)
+        elif p2 >= config.SOLID and p < config.SOLID:
+            # The stamp had slipped to "re-entry required"; this passed re-check renews it.
+            stamp["renewedAt"] = _iso()
+            self.store.put("stamps", f"{user['uid']}_{cid}", stamp)
+            renewed = True
+            log.info("uid=%s renewed the stamp for %s", user["uid"], cid)
+        return {
+            "correct": correct,
+            "correctIndex": probe["correctIndex"],
+            "explanation": probe.get("explanation", ""),
+            "conceptId": cid,
+            "conceptName": self.cat.name(cid),
+            "pKnown": round(p2, 4),
+            "status": bkt.status(p2, ev + 1),
+            "stampEarned": earned,
+            "stampRenewed": renewed,
+            "stamp": stamp,
+        }
 
     def _diagnosis_touching(self, uid: str, cid: str) -> str | None:
-        docs = sorted(self.store.list("diagnoses", lambda d: d["uid"] == uid and (
-            d.get("rootCauseConceptId") == cid or cid in (d.get("path") or []))), key=lambda d: d["createdAt"])
+        docs = sorted(
+            self.store.list(
+                "diagnoses",
+                lambda d: d["uid"] == uid and (d.get("rootCauseConceptId") == cid or cid in (d.get("path") or [])),
+            ),
+            key=lambda d: d["createdAt"],
+        )
         return docs[-1]["id"] if docs else None
 
     # ================================================================== passport ============
     def passport(self, user: dict) -> dict:
         uid = user["uid"]
         mastery = self.mastery_map(uid)
-        stamps = {s["conceptId"]: s for s in self.store.list("stamps", lambda s: s["uid"] == uid)}
+        all_stamps = {s["conceptId"]: s for s in self.store.list("stamps", lambda s: s["uid"] == uid)}
+        # Stamps that still hold. A slipped stamp ("re-entry required") no longer clears a route.
+        stamps = {cid: s for cid, s in all_stamps.items() if not self._stamp_slipped(cid, mastery)}
         open_diag = None
-        for d in sorted(self.store.list("diagnoses", lambda d: d["uid"] == uid and d.get("status") == "done"
-                                        and d.get("rootCauseConceptId")), key=lambda d: d["createdAt"], reverse=True):
+        for d in sorted(
+            self.store.list(
+                "diagnoses",
+                lambda d: d["uid"] == uid and d.get("status") == "done" and d.get("rootCauseConceptId"),
+            ),
+            key=lambda d: d["createdAt"],
+            reverse=True,
+        ):
             if d["targetConceptId"] not in stamps:
                 open_diag = d
                 break
-        entry_required = ({next((c for c in open_diag["path"] if c not in stamps), open_diag["targetConceptId"])}
-                          if open_diag else set())
+        entry_required = (
+            {next((c for c in open_diag["path"] if c not in stamps), open_diag["targetConceptId"])}
+            if open_diag
+            else set()
+        )
         regions: dict[str, list[dict]] = defaultdict(list)
+        summary = {"completed": 0, "reentry": 0, "entryRequired": 0, "inProgress": 0}
         for cid, c in self.cat.concepts.items():
             m = mastery.get(cid)
-            st = stamps.get(cid)
-            if st:
-                state = "endorsed" if st["tier"] == "endorsed" else "stamped"
+            st = all_stamps.get(cid)
+            if st and cid in stamps:
+                state = "stamped"
+                summary["completed"] += 1
+            elif st:
+                state = "reentry"
+                summary["reentry"] += 1
             elif cid in entry_required or (m and m["status"] == "gap"):
                 state = "entry-required"
+                summary["entryRequired"] += 1
             elif m and m["status"] in ("shaky", "solid"):
-                state = m["status"]  # solid without a re-check is not stamped yet
+                state = m["status"]
+                if state == "shaky":
+                    summary["inProgress"] += 1
             else:
                 state = "untested"
-            endorser = self.store.get("users", st["endorsedByUid"]) if st and st.get("endorsedByUid") else None
-            regions[c["area"]].append({"conceptId": cid, "name": c["name"], "state": state,
-                                       "pKnown": m["pKnown"] if m else None,
-                                       "earnedAt": st["earnedAt"] if st else None,
-                                       "endorsedBy": endorser["name"] if endorser else None,
-                                       "endorsedAt": st.get("endorsedAt") if st else None})
-        order = ["Foundations", "Calculus", "Linear algebra", "Probability", "Machine learning"]
-        holder_no = int(uid.encode().hex()[-6:], 16) % 10000
+            regions[c["area"]].append({
+                "conceptId": cid,
+                "name": c["name"],
+                "moduleId": c.get("moduleId"),
+                "topicId": c.get("topicId"),
+                "topicName": c.get("topicName"),
+                "level": c.get("level", "core"),
+                "optional": c.get("optional", False),
+                "depth": c.get("depth", 0),
+                "state": state,
+                "pKnown": m["pKnown"] if m else None,
+                "earnedAt": st["earnedAt"] if st else None,
+                "renewedAt": st.get("renewedAt") if st else None,
+                "canRecheck": bool(self.cat.probes_by_concept.get(cid)),
+            })
+
+        region_order = [m["name"] for m in self.cat.modules] if self.cat.modules else list(ALL_AREAS_ORDER)
+        for area_name in regions:
+            if area_name not in region_order:
+                region_order.append(area_name)
+
+        # The passport number is the student ID. Accounts without one keep a derived number.
+        holder_no = user.get("studentId") or f"A-{int(uid.encode().hex()[-6:], 16) % 10000:04d}"
         nxt = None
         if open_diag:
-            # Entry required = the first stop on the route that is not stamped yet.
             first_open = next((c for c in open_diag["path"] if c not in stamps), open_diag["targetConceptId"])
-            nxt = {"targetConceptId": open_diag["targetConceptId"], "targetName": self.cat.name(open_diag["targetConceptId"]),
-                   "entryRequired": self.cat.name(first_open),
-                   "entryRequiredId": first_open,
-                   "route": [{"id": c, "name": self.cat.name(c), "stamped": c in stamps} for c in open_diag["path"]],
-                   "diagnosisId": open_diag["id"]}
+            nxt = {
+                "targetConceptId": open_diag["targetConceptId"],
+                "targetName": self.cat.name(open_diag["targetConceptId"]),
+                "entryRequired": self.cat.name(first_open),
+                "entryRequiredId": first_open,
+                "route": [{"id": c, "name": self.cat.name(c), "stamped": c in stamps} for c in open_diag["path"]],
+                "diagnosisId": open_diag["id"],
+            }
         style = dict(user.get("passportStyle") or {})
         style.setdefault("cover", PASSPORT_COVERS[0])
         style.setdefault("emblem", PASSPORT_EMBLEMS[0])
+        style.setdefault("photoUrl", None)
+        style.setdefault("customLabs", [])
         lab_names = {lab["id"]: lab["name"] for lab in self.cat.labs}
-        mc = user.get("moodleConnection") or {}
-        moodle_summary = {
-            "connected": bool(mc.get("syncedAt")),
-            "siteName": mc.get("siteName") or "APU Moodle",
-            "mode": mc.get("mode"),
-            "courseCount": len(mc.get("courses") or []),
-            "materialCount": len(mc.get("materials") or []) + len(mc.get("importedMaterials") or []),
-            "deadlineCount": len(mc.get("deadlines") or []),
-            "syncedAt": mc.get("syncedAt"),
-        }
-        return {"holder": style.get("displayName") or user["name"], "holderNo": f"Student #A-{holder_no:04d}",
-                "style": style, "focusLabs": [lab_names[x] for x in style.get("focusLabIds", []) if x in lab_names],
-                "programme": user.get("programme"), "university": user.get("university"),
-                "studentId": user.get("studentId"), "year": user.get("year"), "module": self.cat.course["name"],
-                "regions": [{"name": r, "concepts": regions[r]} for r in order if r in regions],
-                "stamps": len(stamps), "endorsed": sum(1 for s in stamps.values() if s["tier"] == "endorsed"),
-                "next": nxt, "shared": bool(user["consent"].get("sharePassport")), "moodle": moodle_summary}
+        preset_labs = [lab_names[x] for x in style.get("focusLabIds", []) if x in lab_names]
+        custom_labs = [x for x in style.get("customLabs", []) if isinstance(x, str) and x.strip()]
+        focus_labs = preset_labs + [x for x in custom_labs if x not in preset_labs]
 
-    # ================================================================== circles =============
+        ws = gws.ensure_workspace(user)
+        live_now = self._is_live(user)
+        workspace_summary = {
+            "connected": bool(ws.get("connected", True)),
+            "email": ws.get("email") or user.get("email"),
+            "live": live_now,
+            "mode": "oauth-live" if live_now else "workspace",
+            "enabledServices": ws.get("enabledServices", {}),
+            "driveCount": len(ws.get("driveFiles") or []),
+            "calendarCount": len(ws.get("calendarEvents") or []),
+            "openTasksCount": sum(1 for t in (ws.get("tasks") or []) if not t.get("completed")),
+            "docsCount": len(ws.get("docs") or []),
+            "chatSpacesCount": len(ws.get("chatSpaces") or []),
+        }
+        return {
+            "holder": style.get("displayName") or user["name"],
+            "holderNo": holder_no,
+            "style": style,
+            "focusLabs": focus_labs,
+            "programme": user.get("programme"),
+            "university": user.get("university"),
+            "studentId": user.get("studentId"),
+            "year": user.get("year"),
+            "module": self.cat.course["name"],
+            "regions": [{"name": r, "concepts": regions[r]} for r in region_order if r in regions],
+            "stamps": len(stamps),
+            "stampSummary": summary,
+            "next": nxt,
+            "shared": bool(user["consent"].get("sharePassport")),
+            "googleWorkspace": workspace_summary,
+        }
+
+    # ================================================================== peer circles ========
     def _latest_root(self, uid: str) -> str | None:
-        docs = sorted(self.store.list("diagnoses", lambda d: d["uid"] == uid and d.get("status") == "done"
-                                      and d.get("rootCauseConceptId")), key=lambda d: d["createdAt"])
+        docs = sorted(
+            self.store.list(
+                "diagnoses",
+                lambda d: d["uid"] == uid and d.get("status") == "done" and d.get("rootCauseConceptId"),
+            ),
+            key=lambda d: d["createdAt"],
+        )
         return docs[-1]["rootCauseConceptId"] if docs else None
 
     def _active_circles(self, concept: str | None = None) -> list[dict]:
-        return self.store.list("studyCircles", lambda c: c["status"] != "done" and (concept is None or c["conceptId"] == concept))
+        return self.store.list(
+            "studyCircles",
+            lambda c: c["status"] != "done" and (concept is None or c["conceptId"] == concept),
+        )
 
     def _eligible(self, concept: str) -> dict[str, list[str]]:
         in_circle = {u for c in self._active_circles(concept) for u in c["memberUids"]}
@@ -500,16 +882,9 @@ class PuncaService:
             if self._latest_root(u["uid"]) != concept:
                 continue
             if StoreMastery(self.store, u["uid"]).get(concept)[0] >= config.SOLID:
-                continue  # already resolved
+                continue
             out[u["uid"]] = u["availability"]
         return out
-
-    def _booked(self) -> dict[str, int]:
-        b: Counter = Counter()
-        for c in self._active_circles():
-            if c.get("lecturerSlotId"):
-                b[c["lecturerSlotId"]] += len(c["memberUids"])
-        return dict(b)
 
     def circle_view(self, c: dict, viewer: dict) -> dict:
         members = []
@@ -517,23 +892,33 @@ class PuncaService:
             u = self.store.get("users", uid) or {}
             if uid == viewer["uid"]:
                 label = "You"
-            elif viewer["role"] == "lecturer":
-                label = u.get("name") if u.get("consent", {}).get("shareNameWithLecturer") else None
             else:
                 label = u.get("name") if u.get("consent", {}).get("shareNameWithCircle") else None
-            members.append(label or "Anonymous student")
-        slot = self.store.get("lecturerSlots", c["lecturerSlotId"]) if c.get("lecturerSlotId") else None
-        lect = self.store.get("users", slot["lecturerUid"]) if slot else None
+            members.append(label or "Anonymous peer")
         tiers = [(self.store.get("stamps", f"{u}_{c['conceptId']}") or {}).get("tier") for u in c["memberUids"]]
-        return {"id": c["id"], "conceptId": c["conceptId"], "conceptName": self.cat.name(c["conceptId"]),
-                "stampsVerified": sum(1 for t in tiers if t == "verified"),
-                "stampsEndorsed": sum(1 for t in tiers if t == "endorsed"),
-                "status": c["status"], "proposedSlot": c["proposedSlot"], "slotLabel": sched.slot_label(c["proposedSlot"]),
-                "memberCount": len(c["memberUids"]), "members": members,
-                "lecturerSlotId": c.get("lecturerSlotId"), "lecturerConfirmed": c.get("lecturerConfirmed", False),
-                "lecturerName": lect["name"] if lect else None, "slotKind": slot["kind"] if slot else None,
-                "mode": "lecturer" if slot else "peer", "isMember": viewer["uid"] in c["memberUids"],
-                "note": c.get("note"), "synthetic": c.get("synthetic", False)}
+        meet_live = bool(c.get("meetLive")) and bool(gws.clean_meet_link(c.get("meetUrl")))
+        meet_url = gws.clean_meet_link(c.get("meetUrl")) if meet_live else None
+        messages = list(c.get("messages") or [])
+        return {
+            "id": c["id"],
+            "conceptId": c["conceptId"],
+            "conceptName": self.cat.name(c["conceptId"]),
+            "stampsCompleted": sum(1 for t in tiers if t),
+            "stampsVerified": sum(1 for t in tiers if t),
+            "status": c["status"],
+            "proposedSlot": c["proposedSlot"],
+            "slotLabel": sched.slot_label(c["proposedSlot"]),
+            "memberCount": len(c["memberUids"]),
+            "members": members,
+            "mode": "peer",
+            "meetUrl": meet_url,
+            "meetLive": meet_live,
+            "meetNewUrl": gws.MEET_NEW_URL,
+            "messages": messages,
+            "isMember": viewer["uid"] in c["memberUids"],
+            "note": c.get("note"),
+            "synthetic": c.get("synthetic", False),
+        }
 
     def circle_suggestion(self, user: dict, concept: str | None = None) -> dict:
         concept = concept or self._latest_root(user["uid"])
@@ -552,15 +937,25 @@ class PuncaService:
                 return base | {"status": "existing", "circle": self.circle_view(c, user)}
         avail = self._eligible(concept)
         avail[user["uid"]] = user["availability"]
-        prop = sched.propose_circle(concept, avail, self.store.list("lecturerSlots"), self._booked(),
-                                    config.MIN_GROUP_SIZE, config.MAX_GROUP_SIZE, must_include=user["uid"])
+        prop = sched.propose_circle(
+            concept,
+            avail,
+            config.MIN_GROUP_SIZE,
+            config.MAX_GROUP_SIZE,
+            must_include=user["uid"],
+        )
         if not prop:
             others = len(avail) - 1
-            return base | {"status": "not-enough", "peersWithGap": others,
-                           "message": f"{others} other opted-in student(s) share this gap, but fewer than "
-                                      f"{config.MIN_GROUP_SIZE} are free at the same hour as you. Add more free hours "
-                                      "or check back later."}
-        fake = {"id": "proposal", "status": "proposal", **prop}
+            return base | {
+                "status": "not-enough",
+                "peersWithGap": others,
+                "message": (
+                    f"{others} other opted-in student(s) share this gap, but fewer than "
+                    f"{config.MIN_GROUP_SIZE} are free at the same hour as you. Add more free hours "
+                    "or check back later."
+                ),
+            }
+        fake = {"id": "proposal", "status": "proposal", "meetUrl": None, "meetLive": False, "messages": [], **prop}
         return base | {"status": "proposal", "circle": self.circle_view(fake, user)}
 
     def join_circle(self, user: dict, concept: str) -> dict:
@@ -573,24 +968,85 @@ class PuncaService:
             c = self.store.get("studyCircles", sug["circle"]["id"])
             c["memberUids"].append(user["uid"])
             self.store.put("studyCircles", c["id"], c)
+            self._sync_circle_to_workspace(user, c)
             return self.circle_view(c, user)
         if sug["status"] != "proposal":
             raise ServiceError(409, sug.get("message") or "No circle can be formed right now.")
         avail = self._eligible(concept)
         avail[user["uid"]] = user["availability"]
-        prop = sched.propose_circle(concept, avail, self.store.list("lecturerSlots"), self._booked(),
-                                    config.MIN_GROUP_SIZE, config.MAX_GROUP_SIZE, must_include=user["uid"])
+        prop = sched.propose_circle(
+            concept,
+            avail,
+            config.MIN_GROUP_SIZE,
+            config.MAX_GROUP_SIZE,
+            must_include=user["uid"],
+        )
         cid = "c-" + uuid.uuid4().hex[:10]
-        c = {"id": cid, "courseId": self.cat.course["id"], "conceptId": concept, "memberUids": prop["memberUids"],
-             "status": "forming" if prop["lecturerSlotId"] else "scheduled", "proposedSlot": prop["proposedSlot"],
-             "lecturerSlotId": prop["lecturerSlotId"], "lecturerConfirmed": False, "peerMentorUid": None,
-             "createdAt": _iso()}
+        c = {
+            "id": cid,
+            "courseId": self.cat.course["id"],
+            "conceptId": concept,
+            "memberUids": prop["memberUids"],
+            "status": "scheduled",
+            "proposedSlot": prop["proposedSlot"],
+            "mode": "peer",
+            "meetUrl": None,
+            "meetLive": False,
+            "messages": [
+                {
+                    "id": "msg-" + uuid.uuid4().hex[:8],
+                    "sender": "Study Circle",
+                    "text": (
+                        f"Peer circle created for {self.cat.name(concept)} ({sched.slot_label(prop['proposedSlot'])}). "
+                        "Start a Google Meet room and paste the link above, or discuss here!"
+                    ),
+                    "createdAt": _iso(),
+                }
+            ],
+            "createdAt": _iso(),
+        }
         self.store.put("studyCircles", cid, c)
+        self._sync_circle_to_workspace(user, c)
         log.info("circle %s created for %s with %d members", cid, concept, len(c["memberUids"]))
         return self.circle_view(c, user)
 
+    def _sync_circle_to_workspace(self, user: dict, circle: dict) -> None:
+        ws = gws.ensure_workspace(user)
+        concept_name = self.cat.name(circle["conceptId"])
+        meet_live = bool(circle.get("meetLive")) and bool(gws.clean_meet_link(circle.get("meetUrl")))
+        meet_url = gws.clean_meet_link(circle.get("meetUrl")) if meet_live else None
+        existing_space = next((s for s in ws["chatSpaces"] if s.get("circleId") == circle["id"]), None)
+        if existing_space:
+            existing_space["meetUrl"] = meet_url
+            existing_space["meetLive"] = meet_live
+            existing_space["messages"] = list(circle.get("messages") or [])
+        else:
+            ws["chatSpaces"].insert(
+                0,
+                {
+                    "id": "gchat-" + circle["id"],
+                    "name": f"Study Circle · {concept_name}",
+                    "conceptId": circle["conceptId"],
+                    "circleId": circle["id"],
+                    "meetUrl": meet_url,
+                    "meetLive": meet_live,
+                    "messages": list(circle.get("messages") or []),
+                    "createdAt": _iso(),
+                },
+            )
+        self.store.put("users", user["uid"], user)
+
+    def _sync_circle_to_all_members(self, circle: dict) -> None:
+        for uid in circle.get("memberUids") or []:
+            u = self.store.get("users", uid)
+            if u and not u.get("synthetic"):
+                self._sync_circle_to_workspace(u, circle)
+
     def my_circles(self, user: dict) -> list[dict]:
-        return [self.circle_view(c, user) for c in self.store.list("studyCircles", lambda c: user["uid"] in c["memberUids"])]
+        return [
+            self.circle_view(c, user)
+            for c in self.store.list("studyCircles", lambda c: user["uid"] in c["memberUids"])
+        ]
 
     def circle_done(self, user: dict, circle_id: str) -> dict:
         c = self.store.get("studyCircles", circle_id)
@@ -600,324 +1056,603 @@ class PuncaService:
         self.store.put("studyCircles", circle_id, c)
         return self.circle_view(c, user)
 
-    # ================================================================== lecturer ============
-    def _require_lecturer(self, user: dict) -> None:
-        if user["role"] != "lecturer":
-            raise ServiceError(403, "This page is for lecturer accounts.")
-
-    def lecturer_overview(self, user: dict) -> dict:
-        self._require_lecturer(user)
-        lab_names = {lab["id"]: lab["name"] for lab in self.cat.labs}
-        # Demand: students whose latest root cause is still unresolved.
-        demand_users: dict[str, list[str]] = defaultdict(list)
-        demand_labs: dict[str, Counter] = defaultdict(Counter)
-        latest: dict[str, dict] = {}
-        for d in self.store.list("diagnoses", lambda d: d.get("status") == "done" and d.get("rootCauseConceptId")):
-            if d["uid"] not in latest or d["createdAt"] > latest[d["uid"]]["createdAt"]:
-                latest[d["uid"]] = d
-        for uid, d in latest.items():
-            root = d["rootCauseConceptId"]
-            if StoreMastery(self.store, uid).get(root)[0] >= config.SOLID:
-                continue
-            demand_users[root].append(uid)
-            lab = self.cat.lab_for(d["targetConceptId"])
-            if lab:
-                demand_labs[root][lab] += 1
-        demand, hidden = [], 0
-        for root, uids in sorted(demand_users.items(), key=lambda kv: -len(kv[1])):
-            if len(uids) < config.MIN_COUNT_SHOWN:
-                hidden += 1
-                continue
-            top_lab = demand_labs[root].most_common(1)[0][0] if demand_labs[root] else None
-            demand.append({"conceptId": root, "conceptName": self.cat.name(root), "students": len(uids),
-                           "labId": top_lab, "labName": lab_names.get(top_lab)})
-        # Heatmap from anonymised events.
-        cells: dict[str, Counter] = defaultdict(Counter)
-        for ev in self.store.list("diagnosisEvents"):
-            if ev.get("labId"):
-                cells[ev["rootCauseConceptId"]][ev["labId"]] += 1
-        rows = []
-        for root, cnt in sorted(cells.items(), key=lambda kv: -sum(kv[1].values()))[:12]:
-            rows.append({"conceptId": root, "conceptName": self.cat.name(root), "total": sum(cnt.values()),
-                         "cells": {lab["id"]: (cnt[lab["id"]] if cnt[lab["id"]] >= config.MIN_COUNT_SHOWN else None)
-                                   for lab in self.cat.labs},
-                         "hiddenCells": sum(1 for lab in self.cat.labs if 0 < cnt[lab["id"]] < config.MIN_COUNT_SHOWN)})
-        my_slots = self.store.list("lecturerSlots", lambda s: s["lecturerUid"] == user["uid"])
-        my_ids = {s["id"] for s in my_slots}
-        booked = self._booked()
-        circles = [self.circle_view(c, user) for c in self._active_circles() if c.get("lecturerSlotId") in my_ids]
-        slots = [dict(s, label=f"{s['day']} {s['start']:02d}:00-{s['end']:02d}:00", booked=booked.get(s["id"], 0),
-                      linkedNames=[self.cat.name(c) for c in s["linkedConceptIds"]]) for s in my_slots]
-        recent = [e for e in self.store.list("diagnosisEvents") if _parse(e["timestamp"]) > _now() - timedelta(days=14)]
-        shared: dict[str, list[dict]] = defaultdict(list)
-        for s in self.store.list("stamps", lambda s: s.get("shareable")):
-            shared[s["uid"]].append(s)
-        shared_passports = []
-        for uid, sts in shared.items():
-            u = self.store.get("users", uid) or {}
-            shared_passports.append({"name": u.get("name", "Student"), "stamps": [
-                {"conceptName": self.cat.name(s["conceptId"]), "tier": s["tier"]} for s in sts]})
-        return {"minCount": config.MIN_COUNT_SHOWN, "demand": demand, "hiddenDemandGroups": hidden,
-                "heatmap": {"labs": [{"id": lab["id"], "name": lab["name"]} for lab in self.cat.labs], "rows": rows},
-                "slots": sorted(slots, key=lambda s: (sched.DAYS.index(s["day"]), s["start"])),
-                "requests": [c for c in circles if not c["lecturerConfirmed"]],
-                "scheduled": [c for c in circles if c["lecturerConfirmed"]],
-                "stats": {"diagnosesLast14Days": len(recent), "studentsWithOpenGaps": sum(len(v) for v in demand_users.values())},
-                "sharedPassports": shared_passports,
-                "syntheticData": any(e.get("synthetic") for e in self.store.list("diagnosisEvents"))}
-
-    def create_slot(self, user: dict, data: dict) -> dict:
-        self._require_lecturer(user)
-        day, kind = data.get("day"), data.get("kind", "consultation")
-        try:
-            start, end, cap = int(data.get("start")), int(data.get("end")), int(data.get("capacity"))
-        except (TypeError, ValueError):
-            raise ServiceError(400, "Start, end and capacity must be whole numbers.")
-        linked = [c for c in (data.get("linkedConceptIds") or []) if c in self.cat.concepts]
-        if day not in sched.DAYS or not (9 <= start < end <= 18) or not 1 <= cap <= 50:
-            raise ServiceError(400, "Pick a weekday and hours between 09:00 and 18:00, with capacity 1 to 50.")
-        if not linked:
-            raise ServiceError(400, "Link the slot to at least one concept.")
-        if kind not in ("consultation", "gap-clinic"):
-            raise ServiceError(400, "Unknown slot type.")
-        sid = "slot-" + uuid.uuid4().hex[:8]
-        slot = {"id": sid, "lecturerUid": user["uid"], "courseId": self.cat.course["id"], "day": day, "start": start,
-                "end": end, "capacity": cap, "kind": kind, "linkedConceptIds": linked, "createdAt": _iso()}
-        self.store.put("lecturerSlots", sid, slot)
-        return slot
-
-    def open_clinic(self, user: dict, concept: str) -> dict:
-        self._require_lecturer(user)
-        if concept not in self.cat.concepts:
-            raise ServiceError(404, "Unknown concept.")
-        avail = self._eligible(concept)
-        slot, free = sched.best_common_slot(avail)
-        if not slot:
-            raise ServiceError(409, "No opted-in students with this gap have shared their free hours yet.")
-        d, h = slot.split("-")
-        new = self.create_slot(user, {"day": d, "start": int(h), "end": int(h) + 1, "kind": "gap-clinic",
-                                      "capacity": max(8, len(free) + 2), "linkedConceptIds": [concept]})
-        return {"slot": new, "studentsFree": len(free), "slotLabel": sched.slot_label(slot)}
-
-    def _lecturer_circle(self, user: dict, circle_id: str) -> dict:
-        self._require_lecturer(user)
+    def circle_set_meet(self, user: dict, circle_id: str, meet_url: str) -> dict:
         c = self.store.get("studyCircles", circle_id)
-        slot = self.store.get("lecturerSlots", c["lecturerSlotId"]) if c and c.get("lecturerSlotId") else None
-        if not c or not slot or slot["lecturerUid"] != user["uid"]:
-            raise ServiceError(404, "Circle not found in your slots.")
-        return c
-
-    def confirm_circle(self, user: dict, circle_id: str) -> dict:
-        c = self._lecturer_circle(user, circle_id)
-        c.update(lecturerConfirmed=True, status="scheduled")
-        self.store.put("studyCircles", circle_id, c)
-        return self.circle_view(c, user)
-
-    def endorse_circle(self, user: dict, circle_id: str) -> dict:
-        """Countersign the verified stamps of a confirmed circle's members (passport: endorsed tier)."""
-        c = self._lecturer_circle(user, circle_id)
-        if not c.get("lecturerConfirmed"):
-            raise ServiceError(409, "Confirm the session before countersigning stamps.")
-        endorsed, waiting = 0, 0
-        for uid in c["memberUids"]:
-            key = f"{uid}_{c['conceptId']}"
-            s = self.store.get("stamps", key)
-            if s and s["tier"] == "verified":
-                s.update(tier="endorsed", endorsedByUid=user["uid"], endorsedAt=_iso())
-                self.store.put("stamps", key, s, save=False)
-                endorsed += 1
-            elif not s:
-                waiting += 1
-        self.store.save()
-        log.info("lecturer %s endorsed %d stamps in circle %s", user["uid"], endorsed, circle_id)
-        return {"endorsed": endorsed, "waitingForRecheck": waiting, "circle": self.circle_view(c, user)}
-
-    def decline_circle(self, user: dict, circle_id: str) -> dict:
-        c = self._lecturer_circle(user, circle_id)
-        c.update(lecturerSlotId=None, lecturerConfirmed=False, status="scheduled",
-                 note="The lecturer could not take this slot, so the circle meets as a peer session.")
-        self.store.put("studyCircles", circle_id, c)
-        return self.circle_view(c, user)
-
-    # ================================================================== moodle ==============
-    def _concept_passport_state(self, cid: str, mastery: dict, stamps: dict) -> str:
-        st = stamps.get(cid)
-        if st:
-            return "endorsed" if st["tier"] == "endorsed" else "stamped"
-        m = mastery.get(cid)
-        if m and m["status"] == "gap":
-            return "entry-required"
-        if m and m["status"] in ("shaky", "solid"):
-            return m["status"]
-        return "untested"
-
-    def _annotate_moodle_items(self, uid: str, items: list[dict]) -> list[dict]:
-        mastery = self.mastery_map(uid)
-        stamps = {s["conceptId"]: s for s in self.store.list("stamps", lambda s: s["uid"] == uid)}
-        annotated: list[dict] = []
-        for item in items:
-            query_text = f"{item.get('title', '')} {item.get('summary', '')} {' '.join(item.get('files') or [])}"
-            hits = self.cat.search_concepts(query_text, k=3)
-            concepts = []
-            for h in hits:
-                cid = h["conceptId"]
-                c_obj = self.cat.concepts.get(cid) or {}
-                prereqs = [
-                    {
-                        "id": pid,
-                        "name": self.cat.name(pid),
-                        "state": self._concept_passport_state(pid, mastery, stamps),
-                    }
-                    for pid in (c_obj.get("prerequisites") or [])[:3]
-                ]
-                concepts.append({
-                    "conceptId": cid,
-                    "name": h["name"],
-                    "state": self._concept_passport_state(cid, mastery, stamps),
-                    "prerequisites": prereqs,
-                })
-            primary = concepts[0]["conceptId"] if concepts else None
-            course_prefix = f"{item.get('courseName')}: " if item.get("courseName") else ""
-            prompt_body = item.get("fullText") or item.get("summary") or item.get("title") or ""
-            stuck_prompt = f"{course_prefix}{item.get('title', '')} — {prompt_body}"[:1800]
-            ready_count = sum(1 for c in concepts if c["state"] in ("stamped", "endorsed", "solid"))
-            annotated.append(dict(
-                item,
-                concepts=concepts,
-                primaryConceptId=primary,
-                primaryConceptName=self.cat.name(primary),
-                stuckPrompt=stuck_prompt,
-                readiness=f"{ready_count}/{len(concepts)} foundations verified" if concepts else "Ready to map",
-            ))
-        return annotated
-
-    def moodle_check(self, base_url: str | None = None) -> dict:
-        try:
-            return moodle.check_public_config(base_url)
-        except moodle.MoodleError as exc:
-            raise ServiceError(exc.status, exc.message) from exc
-
-    def moodle_status(self, user: dict) -> dict:
-        mc = dict(user.get("moodleConnection") or {})
-        base_url = mc.get("baseUrl") or moodle.DEFAULT_MOODLE_URL
-        pub = mc.get("publicConfig")
-        if not pub:
-            try:
-                pub = moodle.check_public_config(base_url, timeout=3.5)
-            except moodle.MoodleError:
-                pub = moodle.check_public_config(moodle.DEFAULT_MOODLE_URL, timeout=3.5)
-        connected = bool(mc.get("syncedAt"))
-        imported = list(mc.get("importedMaterials") or [])
-        synced_materials = list(mc.get("materials") or [])
-        all_materials = self._annotate_moodle_items(user["uid"], imported + synced_materials)
-        deadlines = self._annotate_moodle_items(user["uid"], list(mc.get("deadlines") or []))
-        conn_view = None
-        if connected:
-            conn_view = {
-                "mode": mc.get("mode"),
-                "baseUrl": mc.get("baseUrl"),
-                "siteName": mc.get("siteName"),
-                "accountName": mc.get("accountName"),
-                "username": mc.get("username"),
-                "tokenMasked": mc.get("tokenMasked"),
-                "syncedAt": mc.get("syncedAt"),
-            }
-        return {
-            "connected": connected,
-            "defaultUrl": moodle.DEFAULT_MOODLE_URL,
-            "publicConfig": pub,
-            "connection": conn_view,
-            "courses": list(mc.get("courses") or []),
-            "materials": all_materials,
-            "deadlines": deadlines,
-        }
-
-    def moodle_connect(self, user: dict, data: dict) -> dict:
-        mode = (data.get("mode") or "token").strip().lower()
-        base_url = data.get("baseUrl") or moodle.DEFAULT_MOODLE_URL
-        prev_imported = list((user.get("moodleConnection") or {}).get("importedMaterials") or [])
-        try:
-            pub = moodle.check_public_config(base_url, timeout=5.0)
-            if mode == "apu-demo":
-                snap = moodle.build_apu_sample_snapshot(user, base_url)
-            elif mode == "token":
-                token = (data.get("token") or "").strip()
-                snap = moodle.sync_with_token(base_url, token)
-                snap["token"] = token
-            else:
-                raise ServiceError(400, "Pick either 'token' (Moodle Security Key) or 'apu-demo'.")
-        except moodle.MoodleError as exc:
-            raise ServiceError(exc.status, exc.message) from exc
-
-        snap["publicConfig"] = pub
-        snap["importedMaterials"] = prev_imported
-        user["moodleConnection"] = snap
-        self.store.put("users", user["uid"], user)
-        log.info("uid=%s connected moodle mode=%s site=%s", user["uid"], mode, snap.get("siteName"))
-        return self.moodle_status(user)
-
-    def moodle_sync(self, user: dict) -> dict:
-        mc = dict(user.get("moodleConnection") or {})
-        if not mc.get("syncedAt"):
-            raise ServiceError(409, "Connect your Moodle account first.")
-        mode = mc.get("mode") or "apu-demo"
-        base_url = mc.get("baseUrl") or moodle.DEFAULT_MOODLE_URL
-        prev_imported = list(mc.get("importedMaterials") or [])
-        try:
-            pub = moodle.check_public_config(base_url, timeout=5.0)
-            if mode == "token" and mc.get("token"):
-                snap = moodle.sync_with_token(base_url, mc["token"])
-                snap["token"] = mc["token"]
-            else:
-                snap = moodle.build_apu_sample_snapshot(user, base_url)
-        except moodle.MoodleError as exc:
-            raise ServiceError(exc.status, exc.message) from exc
-        snap["publicConfig"] = pub
-        snap["importedMaterials"] = prev_imported
-        user["moodleConnection"] = snap
-        self.store.put("users", user["uid"], user)
-        return self.moodle_status(user)
-
-    def moodle_disconnect(self, user: dict) -> dict:
-        user.pop("moodleConnection", None)
-        self.store.put("users", user["uid"], user)
-        log.info("uid=%s disconnected moodle", user["uid"])
-        return self.moodle_status(user)
-
-    def moodle_import(self, user: dict, data: dict) -> dict:
-        try:
-            parsed = moodle.parse_imported_material(
-                title=data.get("title"),
-                course_name=data.get("courseName"),
-                filename=data.get("filename"),
-                content_base64=data.get("contentBase64"),
-                text=data.get("text"),
+        if not c or user["uid"] not in c["memberUids"]:
+            raise ServiceError(404, "Circle not found.")
+        clean = gws.clean_meet_link(meet_url)
+        if not clean:
+            raise ServiceError(
+                400,
+                "Paste a valid Google Meet link (for example https://meet.google.com/abc-defg-hij).",
             )
-        except moodle.MoodleError as exc:
-            raise ServiceError(exc.status, exc.message) from exc
-
-        mc = dict(user.get("moodleConnection") or {})
-        if not mc.get("syncedAt"):
-            mc = moodle.build_apu_sample_snapshot(user, moodle.DEFAULT_MOODLE_URL)
-        imported = list(mc.get("importedMaterials") or [])
-        item = {
-            "id": "moodle-import-" + uuid.uuid4().hex[:8],
-            "courseId": "imported",
-            "courseName": parsed["courseName"],
-            "section": "Uploaded Moodle Material",
-            "kind": "imported",
-            "title": parsed["title"],
-            "files": [parsed["filename"]] if parsed.get("filename") else [],
-            "summary": parsed["summary"],
-            "fullText": parsed["fullText"],
-            "importedAt": _iso(),
+        c["meetUrl"] = clean
+        c["meetLive"] = True
+        msg = {
+            "id": "msg-" + uuid.uuid4().hex[:8],
+            "sender": user.get("name") or "Student",
+            "text": f"Shared Google Meet room for the circle: {clean}",
+            "createdAt": _iso(),
         }
-        imported.insert(0, item)
-        mc["importedMaterials"] = imported[:20]
-        user["moodleConnection"] = mc
+        c.setdefault("messages", []).append(msg)
+        self.store.put("studyCircles", circle_id, c)
+        self._sync_circle_to_all_members(c)
+        return self.circle_view(c, user)
+
+    def circle_chat_post(self, user: dict, circle_id: str, text: str) -> dict:
+        c = self.store.get("studyCircles", circle_id)
+        if not c or user["uid"] not in c["memberUids"]:
+            raise ServiceError(404, "Circle not found.")
+        msg_text = (text or "").strip()
+        if not msg_text:
+            raise ServiceError(400, "Enter a message to post to the study circle chat.")
+        msg = {
+            "id": "msg-" + uuid.uuid4().hex[:8],
+            "sender": user.get("name") or "Student",
+            "text": msg_text[:1000],
+            "createdAt": _iso(),
+        }
+        c.setdefault("messages", []).append(msg)
+        self.store.put("studyCircles", circle_id, c)
+        self._sync_circle_to_all_members(c)
+        return self.circle_view(c, user)
+
+    @staticmethod
+    def _next_slot_start(slot: str) -> datetime:
+        """Next occurrence of a weekday-hour slot like 'Tue-14' in UTC+8 (or tomorrow at that hour)."""
+        now = _now()
+        day_map = {"Mon": 0, "Tue": 1, "Wed": 2, "Thu": 3, "Fri": 4, "Sat": 5, "Sun": 6}
+        try:
+            d_str, h_str = (slot or "").split("-")
+            target_wd = day_map.get(d_str, (now.weekday() + 1) % 7)
+            hour = int(h_str)
+            days_ahead = (target_wd - now.weekday()) % 7 or 7
+            return (now + timedelta(days=days_ahead)).replace(hour=hour, minute=0, second=0, microsecond=0)
+        except Exception:
+            return (now + timedelta(days=1)).replace(minute=0, second=0, microsecond=0)
+
+    def circle_schedule_calendar(self, user: dict, circle_id: str) -> dict:
+        c = self.store.get("studyCircles", circle_id)
+        if not c or user["uid"] not in c["memberUids"]:
+            raise ServiceError(404, "Circle not found.")
+        ws = gws.ensure_workspace(user)
+        concept_name = self.cat.name(c["conceptId"])
+        slot_lbl = sched.slot_label(c["proposedSlot"])
+        start_dt = self._next_slot_start(c["proposedSlot"])
+        start_iso = _iso(start_dt)
+        end_iso = _iso(start_dt + timedelta(hours=1))
+        existing_meet = gws.clean_meet_link(c.get("meetUrl")) if c.get("meetLive") else None
+        desc = f"Peer group study session for {concept_name}."
+        if existing_meet:
+            desc += f" Meet room: {existing_meet}"
+        created = self.google_calendar_create(
+            user,
+            {
+                "title": f"Peer Study Circle: {concept_name} ({slot_lbl})",
+                "description": desc,
+                "startTime": start_iso,
+                "endTime": end_iso,
+                "location": "Google Meet",
+                "includeMeet": True,
+                "meetUrl": existing_meet,
+                "conceptId": c["conceptId"],
+                "circleId": c["id"],
+                "attendees": [ws.get("email") or user.get("email")] if (ws.get("email") or user.get("email")) else [],
+            },
+        )
+        ev = created["event"]
+        if ev.get("meetUrl") and gws.clean_meet_link(ev["meetUrl"]):
+            c["meetUrl"] = gws.clean_meet_link(ev["meetUrl"])
+            c["meetLive"] = True
+            self.store.put("studyCircles", circle_id, c)
+            self._sync_circle_to_all_members(c)
+        return {"event": ev, "warning": created.get("warning"), "circle": self.circle_view(c, user)}
+
+    # ================================================================== Google Workspace ====
+    def _is_live(self, user: dict) -> bool:
+        ws = user.get("googleWorkspace") or {}
+        return bool(ws.get("connected", True) and self.live and self.live.is_live(user["uid"]))
+
+    def _mirror(self, fn) -> tuple[dict | None, str | None]:
+        """Run a live Google call; return (result, None) or (None, warning_message)."""
+        try:
+            return fn(), None
+        except GoogleLiveError as exc:
+            log.warning("live Google call failed: %s", exc.message)
+            return None, exc.message
+
+    def _drive_save(
+        self,
+        user: dict,
+        parsed: dict,
+        raw_bytes: bytes | None = None,
+        mime_type: str | None = None,
+        folder: str | None = None,
+    ) -> tuple[dict, str | None]:
+        ws = gws.ensure_workspace(user)
+        try:
+            gws._require_service(ws, "drive")
+        except gws.WorkspaceError as exc:
+            raise ServiceError(exc.status, exc.message) from exc
+        folder_name = (folder or ws["preferences"].get("driveFolderName") or "Punca Study Materials").strip()
+        mime = (mime_type or "").strip() or gws.guess_mime(parsed["filename"])
+        payload_bytes = raw_bytes if raw_bytes is not None else parsed["text"].encode("utf-8")
+        warning = None
+        live_res = None
+        if self._is_live(user):
+            live_res, warning = self._mirror(
+                lambda: self.live.drive_upload(user["uid"], parsed["filename"], payload_bytes, mime, folder_name)
+            )
+        item = {
+            "id": "gdrive-" + uuid.uuid4().hex[:8],
+            "googleId": (live_res or {}).get("id"),
+            "name": parsed["filename"],
+            "mimeType": mime,
+            "folder": folder_name,
+            "sizeBytes": len(payload_bytes),
+            "updatedAt": _iso(),
+            "webViewLink": (live_res or {}).get("webViewLink"),
+            "live": bool(live_res),
+            "starter": False,
+            "summary": parsed["summary"],
+            "content": parsed["text"][:10000],
+        }
+        ws["driveFiles"].insert(0, item)
         self.store.put("users", user["uid"], user)
-        annotated = self._annotate_moodle_items(user["uid"], [item])[0]
-        return {"imported": annotated, "status": self.moodle_status(user)}
+        return item, warning
+
+    def google_connect(self, user: dict, access_token: str, expires_in: int | None = None) -> dict:
+        ws = gws.ensure_workspace(user)
+        try:
+            info = self.live.connect(user["uid"], access_token, expires_in)
+        except GoogleLiveError as exc:
+            raise ServiceError(exc.status, exc.message) from exc
+        ws["connected"] = True
+        ws["email"] = info["email"]
+        ws["mode"] = "oauth-live"
+        ws["connectedAt"] = _iso()
+        user["googleWorkspace"] = ws
+        self.store.put("users", user["uid"], user)
+        return self.google_status(user)
+
+    def google_disconnect(self, user: dict) -> dict:
+        ws = gws.ensure_workspace(user)
+        self.live.disconnect(user["uid"])
+        ws["mode"] = "workspace"
+        user["googleWorkspace"] = ws
+        self.store.put("users", user["uid"], user)
+        return self.google_status(user)
+
+    def google_status(self, user: dict) -> dict:
+        ws = gws.ensure_workspace(user)
+        # Keep study-circle chat spaces synced with the latest shared circle state
+        for c in self.store.list("studyCircles", lambda c: user["uid"] in c["memberUids"]):
+            self._sync_circle_to_workspace(user, c)
+        ws = user["googleWorkspace"]
+        live_session = self.live.session(user["uid"]) if self.live else None
+        if not live_session and ws.get("mode") == "oauth-live":
+            ws["mode"] = "workspace"
+        self.store.put("users", user["uid"], user)
+        return {
+            "connected": bool(ws.get("connected", True)),
+            "email": (live_session or {}).get("email") or ws.get("email") or user.get("email"),
+            "accountEmail": user.get("email"),
+            "mode": "oauth-live" if live_session else "workspace",
+            "liveConnected": bool(live_session),
+            "liveExpiresAt": live_session["expiresAt"] if live_session else None,
+            "liveAvailable": bool(config.GOOGLE_OAUTH_CLIENT_ID),
+            "oauthClientId": config.GOOGLE_OAUTH_CLIENT_ID or None,
+            "oauthScopes": list(GOOGLE_SCOPES),
+            "meetNewUrl": gws.MEET_NEW_URL,
+            "connectedAt": ws.get("connectedAt"),
+            "enabledServices": ws.get("enabledServices", {}),
+            "preferences": ws.get("preferences", {}),
+            "driveFiles": ws.get("driveFiles", []),
+            "calendarEvents": ws.get("calendarEvents", []),
+            "tasks": ws.get("tasks", []),
+            "docs": ws.get("docs", []),
+            "chatSpaces": ws.get("chatSpaces", []),
+        }
+
+    def google_configure(self, user: dict, data: dict) -> dict:
+        ws = gws.ensure_workspace(user)
+        if "connected" in data and data["connected"] is not None:
+            ws["connected"] = bool(data["connected"])
+            if not ws["connected"]:
+                self.live.disconnect(user["uid"])
+                ws["mode"] = "workspace"
+        if data.get("email"):
+            ws["email"] = data["email"].strip()
+        if data.get("accessToken"):
+            return self.google_connect(user, data["accessToken"], data.get("expiresIn"))
+        if isinstance(data.get("enabledServices"), dict):
+            for k in gws.SERVICES:
+                if k in data["enabledServices"]:
+                    ws["enabledServices"][k] = bool(data["enabledServices"][k])
+        if isinstance(data.get("preferences"), dict):
+            for k in ("driveFolderName", "defaultReminderMinutes", "autoCreateMeetForCircles", "autoSyncTasksFromDiagnosis"):
+                if k in data["preferences"] and data["preferences"][k] is not None:
+                    ws["preferences"][k] = data["preferences"][k]
+        user["googleWorkspace"] = ws
+        self.store.put("users", user["uid"], user)
+        return self.google_status(user)
+
+    def google_drive_upload(self, user: dict, data: dict) -> dict:
+        try:
+            parsed = gws.extract_document_text(
+                filename=data.get("fileName") or data.get("title") or "study-file.txt",
+                content_base64=data.get("fileBase64"),
+                text=data.get("fileText"),
+            )
+        except gws.WorkspaceError as exc:
+            raise ServiceError(exc.status, exc.message) from exc
+        raw_bytes = gws.decode_upload(data.get("fileBase64"))
+        item, warning = self._drive_save(
+            user,
+            parsed,
+            raw_bytes=raw_bytes,
+            mime_type=data.get("mimeType"),
+            folder=data.get("folder"),
+        )
+        return {"file": item, "warning": warning, "workspace": self.google_status(user)}
+
+    def google_drive_delete(self, user: dict, file_id: str) -> dict:
+        ws = gws.ensure_workspace(user)
+        target = next((f for f in ws.get("driveFiles", []) if f["id"] == file_id), None)
+        if target and target.get("live") and target.get("googleId") and self._is_live(user):
+            self._mirror(lambda: self.live.drive_trash(user["uid"], target["googleId"]))
+        ws["driveFiles"] = [f for f in ws.get("driveFiles", []) if f["id"] != file_id]
+        self.store.put("users", user["uid"], user)
+        return self.google_status(user)
+
+    def google_calendar_create(self, user: dict, data: dict) -> dict:
+        ws = gws.ensure_workspace(user)
+        try:
+            gws._require_service(ws, "calendar")
+        except gws.WorkspaceError as exc:
+            raise ServiceError(exc.status, exc.message) from exc
+        title = (data.get("title") or "").strip()
+        if not title:
+            raise ServiceError(400, "Enter a title for the Google Calendar study session or meeting.")
+        start_time = (data.get("startTime") or "").strip() or _iso(_now() + timedelta(days=1))
+        end_time = (data.get("endTime") or "").strip() or gws.one_hour_after(start_time)
+        s_dt, e_dt = gws.parse_time(start_time), gws.parse_time(end_time)
+        if s_dt and e_dt and e_dt <= s_dt:
+            end_time = gws.one_hour_after(start_time)
+        description = (data.get("description") or "").strip()[:800]
+        include_meet = bool(data.get("includeMeet", True))
+        typed_attendees = [
+            a.strip() for a in (data.get("attendees") or []) if isinstance(a, str) and auth.valid_email(a.strip())
+        ]
+        own_email = ws.get("email") or user.get("email")
+        attendees = list(typed_attendees)
+        if own_email and own_email not in attendees:
+            attendees.insert(0, own_email)
+
+        warning = None
+        live_res = None
+        if self._is_live(user):
+            reminder = ws.get("preferences", {}).get("defaultReminderMinutes", 30)
+            live_res, warning = self._mirror(
+                lambda: self.live.calendar_insert(
+                    user["uid"],
+                    title[:140],
+                    description,
+                    start_time,
+                    end_time,
+                    config.PUNCA_TIMEZONE,
+                    typed_attendees,
+                    include_meet,
+                    reminder,
+                )
+            )
+        meet_url = (live_res or {}).get("meetUrl") or gws.clean_meet_link(data.get("meetUrl"))
+        cal_link = (live_res or {}).get("htmlLink") or gws.calendar_template_link(
+            title[:140], description, start_time, end_time, config.PUNCA_TIMEZONE
+        )
+        ev = {
+            "id": "gcal-" + uuid.uuid4().hex[:8],
+            "googleId": (live_res or {}).get("id"),
+            "title": title[:140],
+            "description": description,
+            "startTime": start_time,
+            "endTime": end_time,
+            "location": "Google Meet" if (include_meet or meet_url) else (data.get("location") or "Study Room"),
+            "meetUrl": meet_url,
+            "meetLive": bool(meet_url),
+            "calendarLink": cal_link,
+            "live": bool(live_res),
+            "conceptId": data.get("conceptId"),
+            "circleId": data.get("circleId"),
+            "attendees": attendees,
+            "createdAt": _iso(),
+        }
+        ws["calendarEvents"].insert(0, ev)
+        self.store.put("users", user["uid"], user)
+        return {"event": ev, "warning": warning, "workspace": self.google_status(user)}
+
+    def google_calendar_delete(self, user: dict, event_id: str) -> dict:
+        ws = gws.ensure_workspace(user)
+        target = next((e for e in ws.get("calendarEvents", []) if e["id"] == event_id), None)
+        if target and target.get("live") and target.get("googleId") and self._is_live(user):
+            self._mirror(lambda: self.live.calendar_delete(user["uid"], target["googleId"]))
+        ws["calendarEvents"] = [e for e in ws.get("calendarEvents", []) if e["id"] != event_id]
+        self.store.put("users", user["uid"], user)
+        return self.google_status(user)
+
+    def google_tasks_create(self, user: dict, data: dict) -> dict:
+        ws = gws.ensure_workspace(user)
+        try:
+            gws._require_service(ws, "tasks")
+        except gws.WorkspaceError as exc:
+            raise ServiceError(exc.status, exc.message) from exc
+        title = (data.get("title") or "").strip()
+        if not title:
+            raise ServiceError(400, "Enter a task title.")
+        notes = (data.get("notes") or "").strip()[:600]
+        due = (data.get("due") or (_now() + timedelta(days=2)).date().isoformat())[:10]
+        warning = None
+        live_res = None
+        if self._is_live(user):
+            live_res, warning = self._mirror(lambda: self.live.task_insert(user["uid"], title[:200], notes, due))
+        task = {
+            "id": "gtask-" + uuid.uuid4().hex[:8],
+            "googleId": (live_res or {}).get("id"),
+            "title": title[:200],
+            "notes": notes,
+            "due": due,
+            "completed": False,
+            "completedAt": None,
+            "live": bool(live_res),
+            "conceptId": data.get("conceptId"),
+            "diagnosisId": data.get("diagnosisId"),
+            "createdAt": _iso(),
+        }
+        ws["tasks"].insert(0, task)
+        self.store.put("users", user["uid"], user)
+        return {"task": task, "warning": warning, "workspace": self.google_status(user)}
+
+    def google_tasks_update(self, user: dict, task_id: str, data: dict) -> dict:
+        ws = gws.ensure_workspace(user)
+        target = next((t for t in ws.get("tasks", []) if t["id"] == task_id), None)
+        if not target:
+            raise ServiceError(404, "Task not found.")
+        if "completed" in data and data["completed"] is not None:
+            target["completed"] = bool(data["completed"])
+            target["completedAt"] = _iso() if target["completed"] else None
+        if data.get("title"):
+            target["title"] = data["title"].strip()[:200]
+        if "notes" in data and data["notes"] is not None:
+            target["notes"] = data["notes"].strip()[:600]
+        if "due" in data and data["due"] is not None:
+            target["due"] = data["due"][:10]
+        warning = None
+        if target.get("live") and target.get("googleId") and self._is_live(user):
+            _, warning = self._mirror(
+                lambda: self.live.task_patch(
+                    user["uid"],
+                    target["googleId"],
+                    title=target["title"],
+                    notes=target.get("notes"),
+                    due=target.get("due"),
+                    completed=target["completed"],
+                )
+            )
+        self.store.put("users", user["uid"], user)
+        return {"task": target, "warning": warning, "workspace": self.google_status(user)}
+
+    def google_tasks_delete(self, user: dict, task_id: str) -> dict:
+        ws = gws.ensure_workspace(user)
+        target = next((t for t in ws.get("tasks", []) if t["id"] == task_id), None)
+        if target and target.get("live") and target.get("googleId") and self._is_live(user):
+            self._mirror(lambda: self.live.task_delete(user["uid"], target["googleId"]))
+        ws["tasks"] = [t for t in ws.get("tasks", []) if t["id"] != task_id]
+        self.store.put("users", user["uid"], user)
+        return self.google_status(user)
+
+    def google_tasks_from_diagnosis(self, user: dict, did: str) -> dict:
+        doc = self._own_diagnosis(user["uid"], did)
+        ws = gws.ensure_workspace(user)
+        try:
+            gws._require_service(ws, "tasks")
+        except gws.WorkspaceError as exc:
+            raise ServiceError(exc.status, exc.message) from exc
+        path = doc.get("path") or [doc["targetConceptId"]]
+        created: list[dict] = []
+        warning = None
+        for idx, cid in enumerate(path):
+            cname = self.cat.name(cid)
+            title = f"Step {idx + 1}: Review & pass re-check for {cname}"
+            notes = f"From diagnosis on {self.cat.name(doc['targetConceptId'])}. Complete your Passport stamp for {cname}."
+            due = (_now() + timedelta(days=idx + 1)).date().isoformat()
+            live_res = None
+            if self._is_live(user):
+                live_res, warn = self._mirror(lambda t=title, n=notes, d=due: self.live.task_insert(user["uid"], t, n, d))
+                warning = warning or warn
+            task = {
+                "id": "gtask-" + uuid.uuid4().hex[:8],
+                "googleId": (live_res or {}).get("id"),
+                "title": title,
+                "notes": notes,
+                "due": due,
+                "completed": False,
+                "completedAt": None,
+                "live": bool(live_res),
+                "conceptId": cid,
+                "diagnosisId": did,
+                "createdAt": _iso(),
+            }
+            ws["tasks"].insert(0, task)
+            created.append(task)
+        self.store.put("users", user["uid"], user)
+        return {"created": created, "warning": warning, "workspace": self.google_status(user)}
+
+    def google_docs_create(self, user: dict, data: dict) -> dict:
+        ws = gws.ensure_workspace(user)
+        try:
+            gws._require_service(ws, "docs")
+        except gws.WorkspaceError as exc:
+            raise ServiceError(exc.status, exc.message) from exc
+        title = (data.get("title") or "").strip()
+        if not title:
+            raise ServiceError(400, "Enter a title for the Google Doc.")
+        content = (data.get("content") or "").strip()[:20000]
+        folder = (ws["preferences"].get("driveFolderName") or "Punca Study Materials").strip()
+        warning = None
+        live_res = None
+        if self._is_live(user):
+            live_res, warning = self._mirror(
+                lambda: self.live.doc_create(user["uid"], title[:160], content, folder)
+            )
+        now_iso = _iso()
+        gdoc = {
+            "id": "gdoc-" + uuid.uuid4().hex[:8],
+            "googleId": (live_res or {}).get("id"),
+            "title": title[:160],
+            "conceptId": data.get("conceptId"),
+            "content": content,
+            "url": (live_res or {}).get("webViewLink"),
+            "live": bool(live_res),
+            "updatedAt": now_iso,
+            "createdAt": now_iso,
+        }
+        ws["docs"].insert(0, gdoc)
+        self.store.put("users", user["uid"], user)
+        return {"doc": gdoc, "warning": warning, "workspace": self.google_status(user)}
+
+    def google_docs_update(self, user: dict, doc_id: str, data: dict) -> dict:
+        ws = gws.ensure_workspace(user)
+        target = next((d for d in ws.get("docs", []) if d["id"] == doc_id), None)
+        if not target:
+            raise ServiceError(404, "Google Doc not found.")
+        if data.get("title"):
+            target["title"] = data["title"].strip()[:160]
+        if "content" in data and data["content"] is not None:
+            target["content"] = data["content"][:20000]
+        target["updatedAt"] = _iso()
+        warning = None
+        if target.get("live") and target.get("googleId") and self._is_live(user):
+            _, warning = self._mirror(
+                lambda: self.live.doc_update(
+                    user["uid"],
+                    target["googleId"],
+                    target["title"] if data.get("title") else None,
+                    target["content"] if "content" in data else None,
+                )
+            )
+        self.store.put("users", user["uid"], user)
+        return {"doc": target, "warning": warning, "workspace": self.google_status(user)}
+
+    def google_docs_delete(self, user: dict, doc_id: str) -> dict:
+        ws = gws.ensure_workspace(user)
+        target = next((d for d in ws.get("docs", []) if d["id"] == doc_id), None)
+        if target and target.get("live") and target.get("googleId") and self._is_live(user):
+            self._mirror(lambda: self.live.drive_trash(user["uid"], target["googleId"]))
+        ws["docs"] = [d for d in ws.get("docs", []) if d["id"] != doc_id]
+        self.store.put("users", user["uid"], user)
+        return self.google_status(user)
+
+    def google_docs_from_diagnosis(self, user: dict, did: str) -> dict:
+        doc = self._own_diagnosis(user["uid"], did)
+        rem = self.remediation(user["uid"], did)
+        ws = gws.ensure_workspace(user)
+        try:
+            gws._require_service(ws, "docs")
+        except gws.WorkspaceError as exc:
+            raise ServiceError(exc.status, exc.message) from exc
+        root_name = self.cat.name(doc.get("rootCauseConceptId")) or "Foundation"
+        target_name = self.cat.name(doc.get("targetConceptId"))
+        route_str = " → ".join(self.cat.name(c) for c in (doc.get("path") or []))
+        points = "\n".join(f"- {kp}" for kp in (rem.get("keyPoints") or []))
+        content = (
+            f"# Study Notes: {root_name} (for {target_name})\n\n"
+            f"**Original Question / Lab Brief:** {doc.get('stuckInput')}\n\n"
+            f"**Remediation Route:** {route_str}\n\n"
+            f"## Core Explanation\n{rem.get('explanation', '')}\n\n"
+            f"## Key Takeaways\n{points}\n"
+        )
+        title = f"Punca Notes · {root_name} → {target_name}"
+        folder = (ws["preferences"].get("driveFolderName") or "Punca Study Materials").strip()
+        warning = None
+        live_res = None
+        if self._is_live(user):
+            live_res, warning = self._mirror(lambda: self.live.doc_create(user["uid"], title, content, folder))
+        now_iso = _iso()
+        gdoc = {
+            "id": "gdoc-" + uuid.uuid4().hex[:8],
+            "googleId": (live_res or {}).get("id"),
+            "title": title,
+            "conceptId": doc.get("rootCauseConceptId"),
+            "diagnosisId": did,
+            "content": content,
+            "url": (live_res or {}).get("webViewLink"),
+            "live": bool(live_res),
+            "updatedAt": now_iso,
+            "createdAt": now_iso,
+        }
+        ws["docs"].insert(0, gdoc)
+        self.store.put("users", user["uid"], user)
+        return {"doc": gdoc, "warning": warning, "workspace": self.google_status(user)}
+
+    def google_chat_create_space(self, user: dict, data: dict) -> dict:
+        ws = gws.ensure_workspace(user)
+        try:
+            gws._require_service(ws, "chat")
+        except gws.WorkspaceError as exc:
+            raise ServiceError(exc.status, exc.message) from exc
+        name = (data.get("name") or "").strip()
+        if not name:
+            raise ServiceError(400, "Enter a name for the peer chat space.")
+        meet_url = gws.clean_meet_link(data.get("meetUrl"))
+        space = {
+            "id": "gchat-" + uuid.uuid4().hex[:8],
+            "name": name[:120],
+            "conceptId": data.get("conceptId"),
+            "circleId": data.get("circleId"),
+            "meetUrl": meet_url,
+            "meetLive": bool(meet_url),
+            "messages": [
+                {
+                    "id": "msg-" + uuid.uuid4().hex[:8],
+                    "sender": user.get("name") or "Student",
+                    "text": f"Created peer discussion space '{name}'. Start a Google Meet room anytime and share the link here.",
+                    "createdAt": _iso(),
+                }
+            ],
+            "createdAt": _iso(),
+        }
+        ws["chatSpaces"].insert(0, space)
+        self.store.put("users", user["uid"], user)
+        return {"space": space, "workspace": self.google_status(user)}
+
+    def google_chat_post(self, user: dict, space_id: str, text: str) -> dict:
+        ws = gws.ensure_workspace(user)
+        try:
+            gws._require_service(ws, "chat")
+        except gws.WorkspaceError as exc:
+            raise ServiceError(exc.status, exc.message) from exc
+        space = next((s for s in ws.get("chatSpaces", []) if s["id"] == space_id), None)
+        if not space:
+            raise ServiceError(404, "Chat space not found.")
+        msg_text = (text or "").strip()
+        if not msg_text:
+            raise ServiceError(400, "Enter a message.")
+        if space.get("circleId"):
+            c = self.store.get("studyCircles", space["circleId"])
+            if c and user["uid"] in c["memberUids"]:
+                self.circle_chat_post(user, c["id"], msg_text)
+                ws = user["googleWorkspace"]
+                space = next((s for s in ws.get("chatSpaces", []) if s["id"] == space_id), space)
+                return {"space": space, "workspace": self.google_status(user)}
+        msg = {
+            "id": "msg-" + uuid.uuid4().hex[:8],
+            "sender": user.get("name") or "Student",
+            "text": msg_text[:1000],
+            "createdAt": _iso(),
+        }
+        space.setdefault("messages", []).append(msg)
+        self.store.put("users", user["uid"], user)
+        return {"space": space, "workspace": self.google_status(user)}
 
 
 def _label(tag: str | None) -> str | None:

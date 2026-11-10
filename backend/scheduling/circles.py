@@ -1,7 +1,6 @@
-"""Study Circle grouping and lecturer-slot matching (README section 10, MVP matching logic).
+"""Peer Study Circle grouping and common-hour matching.
 
-Availability is a list of one-hour slots written "Tue-14" (Tuesday 14:00-15:00). Lecturer slots cover
-whole hours: {"day": "Tue", "start": 14, "end": 16} covers Tue-14 and Tue-15.
+Availability is a list of one-hour slots written "Tue-14" (Tuesday 14:00-15:00).
 """
 from __future__ import annotations
 
@@ -20,11 +19,6 @@ def slot_label(s: str) -> str:
     return f"{d} {int(h):02d}:00-{int(h) + 1:02d}:00"
 
 
-def slot_covered(lecturer_slot: dict, s: str) -> bool:
-    d, h = s.split("-")
-    return lecturer_slot["day"] == d and lecturer_slot["start"] <= int(h) < lecturer_slot["end"]
-
-
 def best_common_slot(availability: dict[str, list[str]], must_include: str | None = None) -> tuple[str | None, list[str]]:
     """The slot most members share (earliest wins ties). Returns (slot, uids available then)."""
     best: tuple[str | None, list[str]] = (None, [])
@@ -37,15 +31,17 @@ def best_common_slot(availability: dict[str, list[str]], must_include: str | Non
     return best
 
 
-def propose_circle(concept_id: str, availability: dict[str, list[str]], lecturer_slots: list[dict],
-                   booked: dict[str, int], min_size: int, max_size: int,
-                   must_include: str | None = None) -> dict | None:
-    """Pick a time and members for one concept.
+def propose_circle(
+    concept_id: str,
+    availability: dict[str, list[str]],
+    min_size: int,
+    max_size: int,
+    must_include: str | None = None,
+) -> dict | None:
+    """Pick a time and members for one concept peer study circle.
 
     availability: uid -> slots for every opted-in student whose root cause is concept_id.
-    booked: lecturerSlotId -> seats already taken.
-    Prefers a time covered by a lecturer slot linked to the concept with enough free seats, then more
-    members, then the earliest slot. Returns None when fewer than min_size students share any hour.
+    Returns None when fewer than min_size students share any hour.
     """
     best = None
     for s in ALL_SLOTS:
@@ -57,15 +53,10 @@ def propose_circle(concept_id: str, availability: dict[str, list[str]], lecturer
         group = uids[:max_size]
         if len(group) < min_size:
             continue
-        fits = [ls for ls in lecturer_slots
-                if concept_id in ls.get("linkedConceptIds", []) and slot_covered(ls, s)
-                and ls["capacity"] - booked.get(ls["id"], 0) >= len(group)]
-        fits.sort(key=lambda ls: (ls["capacity"] - booked.get(ls["id"], 0) - len(group), SLOT_ORDER[s]))
-        score = (1 if fits else 0, len(group), -SLOT_ORDER[s])
+        score = (len(group), -SLOT_ORDER[s])
         if best is None or score > best[0]:
-            best = (score, s, group, fits[0] if fits else None)
+            best = (score, s, group)
     if best is None:
         return None
-    _, s, group, lect = best
-    return {"conceptId": concept_id, "memberUids": group, "proposedSlot": s,
-            "lecturerSlotId": lect["id"] if lect else None, "mode": "lecturer" if lect else "peer"}
+    _, s, group = best
+    return {"conceptId": concept_id, "memberUids": group, "proposedSlot": s, "mode": "peer"}

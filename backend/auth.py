@@ -49,3 +49,11 @@ def token_key(token: str) -> str:
 
 def valid_email(email: str) -> bool:
     return bool(EMAIL_RE.match(email)) and len(email) <= 120
+
+
+PERSONAL_GMAIL_DOMAINS = ("gmail.com", "googlemail.com")
+
+
+def is_personal_gmail(email: str) -> bool:
+    """Sign-up asks for a personal Gmail address: it is the Google account Punca connects to."""
+    return valid_email(email) and email.rsplit("@", 1)[-1].lower() in PERSONAL_GMAIL_DOMAINS

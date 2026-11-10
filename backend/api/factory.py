@@ -7,7 +7,8 @@ import traceback
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, Header, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 import config
@@ -20,7 +21,7 @@ from content import Catalog  # noqa: E402
 from llm.client import LLMClient  # noqa: E402
 from llm.service import LLMService  # noqa: E402
 from store.local_store import LocalStore  # noqa: E402
-from store.seed import seed_store  # noqa: E402
+from store.seed import DEMO_ACCOUNTS, DEMO_PASSWORD, ensure_demo_users, seed_store  # noqa: E402
 
 log = logging.getLogger("punca.api")
 client_log = logging.getLogger("punca.client")
@@ -52,7 +53,12 @@ class ProfileBody(BaseModel):
 
 
 class MapBody(BaseModel):
-    stuckInput: str
+    stuckInput: str = ""
+    fileName: str | None = None
+    fileBase64: str | None = None
+    fileText: str | None = None
+    driveFileId: str | None = None
+    saveToDrive: bool = False
 
 
 class StartBody(BaseModel):
@@ -64,19 +70,19 @@ class StartBody(BaseModel):
 class AnswerBody(BaseModel):
     probeId: str
     choiceIndex: int
+    confidence: str = "medium"
 
 
 class ConceptBody(BaseModel):
     conceptId: str
 
 
-class SlotBody(BaseModel):
-    day: str
-    start: int
-    end: int
-    capacity: int
-    linkedConceptIds: list[str]
-    kind: str = "consultation"
+class CircleMessageBody(BaseModel):
+    text: str
+
+
+class CircleMeetBody(BaseModel):
+    meetUrl: str
 
 
 class ClientLogBody(BaseModel):
@@ -86,22 +92,73 @@ class ClientLogBody(BaseModel):
     url: str | None = None
 
 
-class MoodleCheckBody(BaseModel):
-    baseUrl: str | None = None
+class GoogleConnectBody(BaseModel):
+    accessToken: str
+    expiresIn: int | None = None
 
 
-class MoodleConnectBody(BaseModel):
-    mode: str = "token"
-    baseUrl: str | None = None
-    token: str | None = None
+class GoogleConfigBody(BaseModel):
+    connected: bool | None = None
+    email: str | None = None
+    accessToken: str | None = None
+    expiresIn: int | None = None
+    enabledServices: dict | None = None
+    preferences: dict | None = None
 
 
-class MoodleImportBody(BaseModel):
+class DriveUploadBody(BaseModel):
+    fileName: str | None = None
+    fileBase64: str | None = None
+    fileText: str | None = None
+    mimeType: str | None = None
+    folder: str | None = None
+
+
+class CalendarEventBody(BaseModel):
+    title: str
+    description: str | None = None
+    startTime: str | None = None
+    endTime: str | None = None
+    location: str | None = None
+    includeMeet: bool = True
+    conceptId: str | None = None
+    attendees: list[str] | None = None
+
+
+class TaskCreateBody(BaseModel):
+    title: str
+    notes: str | None = None
+    due: str | None = None
+    conceptId: str | None = None
+    diagnosisId: str | None = None
+
+
+class TaskUpdateBody(BaseModel):
     title: str | None = None
-    courseName: str | None = None
-    filename: str | None = None
-    contentBase64: str | None = None
-    text: str | None = None
+    notes: str | None = None
+    due: str | None = None
+    completed: bool | None = None
+
+
+class DocCreateBody(BaseModel):
+    title: str
+    content: str = ""
+    conceptId: str | None = None
+
+
+class DocUpdateBody(BaseModel):
+    title: str | None = None
+    content: str | None = None
+
+
+class ChatSpaceCreateBody(BaseModel):
+    name: str
+    conceptId: str | None = None
+    circleId: str | None = None
+
+
+class ChatMessageBody(BaseModel):
+    text: str
 
 
 def create_app(store_path: Path | None = None, offline: bool | None = None) -> FastAPI:
@@ -110,10 +167,12 @@ def create_app(store_path: Path | None = None, offline: bool | None = None) -> F
     if store.empty:
         log.info("store is empty: seeding synthetic demo data")
         seed_store(store, catalog)
+    else:
+        ensure_demo_users(store, catalog)
     llm_client = LLMClient(offline=offline)
     svc = PuncaService(catalog, store, LLMService(catalog, llm_client))
 
-    app = FastAPI(title="Punca API", version="0.1.0")
+    app = FastAPI(title="Punca API", version="0.2.0")
     app.state.svc = svc
 
     @app.exception_handler(ServiceError)
@@ -122,8 +181,13 @@ def create_app(store_path: Path | None = None, offline: bool | None = None) -> F
 
     @app.exception_handler(Exception)
     async def _unhandled(request: Request, exc: Exception):
-        log.error("unhandled error on %s %s: %s\n%s", request.method, request.url.path, exc,
-                  "".join(traceback.format_exception(exc)))
+        log.error(
+            "unhandled error on %s %s: %s\n%s",
+            request.method,
+            request.url.path,
+            exc,
+            "".join(traceback.format_exception(exc)),
+        )
         return JSONResponse(status_code=500, content={"error": "Something went wrong on the server. It has been logged."})
 
     @app.middleware("http")
@@ -131,8 +195,13 @@ def create_app(store_path: Path | None = None, offline: bool | None = None) -> F
         t0 = time.perf_counter()
         response = await call_next(request)
         if request.url.path.startswith("/api"):
-            log.info("%s %s -> %s (%.0f ms)", request.method, request.url.path, response.status_code,
-                     (time.perf_counter() - t0) * 1000)
+            log.info(
+                "%s %s -> %s (%.0f ms)",
+                request.method,
+                request.url.path,
+                response.status_code,
+                (time.perf_counter() - t0) * 1000,
+            )
         return response
 
     # ---- auth helpers ----------------------------------------------------------------------
@@ -150,8 +219,24 @@ def create_app(store_path: Path | None = None, offline: bool | None = None) -> F
     # ---- public ------------------------------------------------------------------------------
     @app.get("/api/health")
     def health():
-        return {"ok": True, "llm": {"mode": llm_client.mode, "model": llm_client.model, "models": llm_client.models,
-                                    "lastModel": llm_client.last_model, "reason": llm_client.reason}}
+        return {
+            "ok": True,
+            "llm": {
+                "mode": llm_client.mode,
+                "model": llm_client.model,
+                "models": llm_client.models,
+                "lastModel": llm_client.last_model,
+                "reason": llm_client.reason,
+            },
+            "google": {
+                "liveAvailable": bool(config.GOOGLE_OAUTH_CLIENT_ID),
+                "clientId": config.GOOGLE_OAUTH_CLIENT_ID or None,
+            },
+        }
+
+    @app.get("/api/demo/accounts")
+    def demo_accounts():
+        return {"password": DEMO_PASSWORD, "accounts": DEMO_ACCOUNTS}
 
     @app.get("/api/catalog")
     def get_catalog():
@@ -196,7 +281,7 @@ def create_app(store_path: Path | None = None, offline: bool | None = None) -> F
 
     @app.post("/api/map")
     def map_stuck(body: MapBody, user: dict = Depends(student)):
-        return svc.map_stuck(body.stuckInput)
+        return svc.map_stuck(user, body.stuckInput, body.model_dump())
 
     @app.post("/api/diagnoses")
     def start(body: StartBody, user: dict = Depends(student)):
@@ -212,7 +297,7 @@ def create_app(store_path: Path | None = None, offline: bool | None = None) -> F
 
     @app.post("/api/diagnoses/{did}/answer")
     def answer(did: str, body: AnswerBody, user: dict = Depends(student)):
-        return svc.answer(user["uid"], did, body.probeId, body.choiceIndex)
+        return svc.answer(user["uid"], did, body.probeId, body.choiceIndex, confidence=body.confidence)
 
     @app.get("/api/diagnoses/{did}/remediation")
     def remediation(did: str, user: dict = Depends(student)):
@@ -230,7 +315,7 @@ def create_app(store_path: Path | None = None, offline: bool | None = None) -> F
     def recheck_answer(body: AnswerBody, user: dict = Depends(student)):
         return svc.recheck_answer(user, body.probeId, body.choiceIndex)
 
-    # ---- student: circles --------------------------------------------------------------------
+    # ---- student: peer study circles ---------------------------------------------------------
     @app.get("/api/circles/suggestion")
     def circle_suggestion(conceptId: str | None = None, user: dict = Depends(student)):
         return svc.circle_suggestion(user, conceptId)
@@ -247,57 +332,111 @@ def create_app(store_path: Path | None = None, offline: bool | None = None) -> F
     def circle_done(circle_id: str, user: dict = Depends(student)):
         return svc.circle_done(user, circle_id)
 
-    # ---- student: moodle ---------------------------------------------------------------------
-    @app.get("/api/moodle/status")
-    def moodle_status(user: dict = Depends(student)):
-        return svc.moodle_status(user)
+    @app.post("/api/circles/{circle_id}/chat")
+    def circle_chat(circle_id: str, body: CircleMessageBody, user: dict = Depends(student)):
+        return svc.circle_chat_post(user, circle_id, body.text)
 
-    @app.post("/api/moodle/check")
-    def moodle_check(body: MoodleCheckBody, user: dict = Depends(student)):
-        return svc.moodle_check(body.baseUrl)
+    @app.post("/api/circles/{circle_id}/meet")
+    def circle_meet(circle_id: str, body: CircleMeetBody, user: dict = Depends(student)):
+        return svc.circle_set_meet(user, circle_id, body.meetUrl)
 
-    @app.post("/api/moodle/connect")
-    def moodle_connect(body: MoodleConnectBody, user: dict = Depends(student)):
-        return svc.moodle_connect(user, body.model_dump())
+    @app.post("/api/circles/{circle_id}/calendar")
+    def circle_calendar(circle_id: str, user: dict = Depends(student)):
+        return svc.circle_schedule_calendar(user, circle_id)
 
-    @app.post("/api/moodle/sync")
-    def moodle_sync(user: dict = Depends(student)):
-        return svc.moodle_sync(user)
+    # ---- student: Google Workspace -----------------------------------------------------------
+    @app.get("/api/google/status")
+    def google_status(user: dict = Depends(student)):
+        return svc.google_status(user)
 
-    @app.delete("/api/moodle/connection")
-    def moodle_disconnect(user: dict = Depends(student)):
-        return svc.moodle_disconnect(user)
+    @app.post("/api/google/connect")
+    def google_connect(body: GoogleConnectBody, user: dict = Depends(student)):
+        return svc.google_connect(user, body.accessToken, body.expiresIn)
 
-    @app.post("/api/moodle/import")
-    def moodle_import(body: MoodleImportBody, user: dict = Depends(student)):
-        return svc.moodle_import(user, body.model_dump())
+    @app.post("/api/google/disconnect")
+    def google_disconnect(user: dict = Depends(student)):
+        return svc.google_disconnect(user)
 
-    # ---- lecturer ----------------------------------------------------------------------------
-    @app.get("/api/lecturer/overview")
-    def overview(user: dict = Depends(current_user)):
-        return svc.lecturer_overview(user)
+    @app.post("/api/google/configure")
+    def google_configure(body: GoogleConfigBody, user: dict = Depends(student)):
+        return svc.google_configure(user, body.model_dump(exclude_none=True))
 
-    @app.post("/api/lecturer/slots")
-    def create_slot(body: SlotBody, user: dict = Depends(current_user)):
-        return svc.create_slot(user, body.model_dump())
+    @app.post("/api/google/drive/upload")
+    def google_drive_upload(body: DriveUploadBody, user: dict = Depends(student)):
+        return svc.google_drive_upload(user, body.model_dump())
 
-    @app.post("/api/lecturer/clinic")
-    def open_clinic(body: ConceptBody, user: dict = Depends(current_user)):
-        return svc.open_clinic(user, body.conceptId)
+    @app.delete("/api/google/drive/{file_id}")
+    def google_drive_delete(file_id: str, user: dict = Depends(student)):
+        return svc.google_drive_delete(user, file_id)
 
-    @app.post("/api/lecturer/circles/{circle_id}/confirm")
-    def confirm(circle_id: str, user: dict = Depends(current_user)):
-        return svc.confirm_circle(user, circle_id)
+    @app.post("/api/google/calendar/events")
+    def google_calendar_create(body: CalendarEventBody, user: dict = Depends(student)):
+        return svc.google_calendar_create(user, body.model_dump())
 
-    @app.post("/api/lecturer/circles/{circle_id}/endorse")
-    def endorse(circle_id: str, user: dict = Depends(current_user)):
-        return svc.endorse_circle(user, circle_id)
+    @app.delete("/api/google/calendar/events/{event_id}")
+    def google_calendar_delete(event_id: str, user: dict = Depends(student)):
+        return svc.google_calendar_delete(user, event_id)
 
-    @app.post("/api/lecturer/circles/{circle_id}/decline")
-    def decline(circle_id: str, user: dict = Depends(current_user)):
-        return svc.decline_circle(user, circle_id)
+    @app.post("/api/google/tasks")
+    def google_tasks_create(body: TaskCreateBody, user: dict = Depends(student)):
+        return svc.google_tasks_create(user, body.model_dump())
 
-    log.info("Punca API ready: %d concepts, %d probes, %d note passages, LLM mode %s",
-             len(catalog.concepts), len(catalog.probes), len(catalog.notes), llm_client.mode)
+    @app.patch("/api/google/tasks/{task_id}")
+    def google_tasks_update(task_id: str, body: TaskUpdateBody, user: dict = Depends(student)):
+        return svc.google_tasks_update(user, task_id, body.model_dump(exclude_none=True))
+
+    @app.delete("/api/google/tasks/{task_id}")
+    def google_tasks_delete(task_id: str, user: dict = Depends(student)):
+        return svc.google_tasks_delete(user, task_id)
+
+    @app.post("/api/google/tasks/from-diagnosis/{did}")
+    def google_tasks_from_diagnosis(did: str, user: dict = Depends(student)):
+        return svc.google_tasks_from_diagnosis(user, did)
+
+    @app.post("/api/google/docs")
+    def google_docs_create(body: DocCreateBody, user: dict = Depends(student)):
+        return svc.google_docs_create(user, body.model_dump())
+
+    @app.patch("/api/google/docs/{doc_id}")
+    def google_docs_update(doc_id: str, body: DocUpdateBody, user: dict = Depends(student)):
+        return svc.google_docs_update(user, doc_id, body.model_dump(exclude_none=True))
+
+    @app.delete("/api/google/docs/{doc_id}")
+    def google_docs_delete(doc_id: str, user: dict = Depends(student)):
+        return svc.google_docs_delete(user, doc_id)
+
+    @app.post("/api/google/docs/from-diagnosis/{did}")
+    def google_docs_from_diagnosis(did: str, user: dict = Depends(student)):
+        return svc.google_docs_from_diagnosis(user, did)
+
+    @app.post("/api/google/chat/spaces")
+    def google_chat_create_space(body: ChatSpaceCreateBody, user: dict = Depends(student)):
+        return svc.google_chat_create_space(user, body.model_dump())
+
+    @app.post("/api/google/chat/spaces/{space_id}/messages")
+    def google_chat_post(space_id: str, body: ChatMessageBody, user: dict = Depends(student)):
+        return svc.google_chat_post(user, space_id, body.text)
+
+    dist_dir = Path(__file__).resolve().parents[2] / "frontend" / "dist"
+    if dist_dir.is_dir() and (dist_dir / "index.html").is_file():
+        assets_dir = dist_dir / "assets"
+        if assets_dir.is_dir():
+            app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+
+        @app.get("/{full_path:path}", include_in_schema=False)
+        def serve_spa(full_path: str):
+            if full_path == "api" or full_path.startswith("api/"):
+                return JSONResponse(status_code=404, content={"error": "Not found"})
+            candidate = (dist_dir / full_path).resolve()
+            if full_path and candidate.is_file() and str(candidate).startswith(str(dist_dir.resolve())):
+                return FileResponse(str(candidate))
+            return FileResponse(str(dist_dir / "index.html"))
+
+    log.info(
+        "Punca API ready: %d concepts, %d probes, %d note passages, LLM mode %s",
+        len(catalog.concepts),
+        len(catalog.probes),
+        len(catalog.notes),
+        llm_client.mode,
+    )
     return app
-

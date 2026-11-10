@@ -244,8 +244,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary-2); outl
 
 /* ---------- passport ---------- */
 .passport-page { max-width: 980px; margin: 0 auto; }
-.passport { background: var(--paper); border: 1px solid #e6dfcf; border-radius: 18px; box-shadow: var(--shadow); overflow: hidden; margin-bottom: 18px;
-  background-image: repeating-linear-gradient(0deg, transparent 0 27px, rgba(29, 52, 70, .035) 27px 28px); }
+.passport { background: var(--paper); border: 1px solid #e6dfcf; border-radius: 18px; box-shadow: var(--shadow); overflow: hidden; margin-bottom: 18px; }
 .pp-cover { display: grid; grid-template-columns: 1.2fr 1.4fr auto; gap: 18px; align-items: center; padding: 22px 24px; background: var(--navy); color: #f3ead5;
   background-image: linear-gradient(135deg, rgba(255,255,255,.07), rgba(0,0,0,.12)); }
 .pp-cover.compact { grid-template-columns: 1fr; border-radius: 16px; padding: 26px 24px; min-height: 360px; align-content: space-between; box-shadow: var(--shadow); }
@@ -362,7 +361,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary-2); outl
   background: var(--paper); border: 1px solid #e6dfcf; }
 .lp-pp-head { display: flex; justify-content: space-between; padding: 16px 20px; background: var(--navy); color: #f3ead5; font-family: var(--serif); letter-spacing: .12em; font-weight: 700; font-size: 14px; }
 .lp-pp-head span:last-child { letter-spacing: .02em; font-weight: 400; opacity: .85; }
-.lp-pp-body { padding: 14px 20px 18px; background-image: repeating-linear-gradient(0deg, transparent 0 27px, rgba(29, 52, 70, .04) 27px 28px); }
+.lp-pp-body { padding: 14px 20px 18px; }
 .lp-pp-region { font-family: var(--serif); font-weight: 700; color: var(--navy); margin: 8px 0; font-size: 14px; }
 .lp-visas { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .lp-visa { position: relative; min-height: 86px; border: 1px solid #e3dac6; border-radius: 10px; background: rgba(255, 255, 255, .6); padding: 9px 11px; font-size: 13px; }

@@ -1,0 +1,3659 @@
+{
+  "meta": {
+    "name": "Root Cause concept graph (prototype)",
+    "schemaVersion": "1.0",
+    "edgeSemantics": "An edge {concept: A, prerequisite: B} means B should be understood before A. 'hard' edges are used for root-cause tracing; 'soft' edges are cross-links for suggestions only.",
+    "provenance": "Drafted from standard introductory curricula for these subjects, not copied from APU module descriptors. Review every topic and edge against the official APU module guides and lecture slides before treating it as ground truth.",
+    "counts": {
+      "modules": 6,
+      "topics": 28,
+      "concepts": 138,
+      "hardEdges": 211,
+      "softEdges": 16,
+      "maxDepth": 12,
+      "perModule": {
+        "FND-MATH": 8,
+        "FND-COMP": 12,
+        "CM": 41,
+        "PY": 26,
+        "JAVA": 25,
+        "DB": 26
+      }
+    }
+  },
+  "modules": [
+    {
+      "id": "FND-MATH",
+      "name": "Maths Foundations (pre-university)",
+      "type": "foundation",
+      "prerequisiteModuleIds": [],
+      "recommendedModuleIds": [],
+      "topicIds": [
+        "T-FM1",
+        "T-FM2",
+        "T-FM3"
+      ]
+    },
+    {
+      "id": "FND-COMP",
+      "name": "Computing & Programming Foundations",
+      "type": "foundation",
+      "prerequisiteModuleIds": [],
+      "recommendedModuleIds": [],
+      "topicIds": [
+        "T-FC1",
+        "T-FC2"
+      ]
+    },
+    {
+      "id": "CM",
+      "name": "Computational Mathematics",
+      "type": "main",
+      "prerequisiteModuleIds": [
+        "FND-MATH"
+      ],
+      "recommendedModuleIds": [
+        "FND-COMP"
+      ],
+      "topicIds": [
+        "T-CM1",
+        "T-CM2",
+        "T-CM3",
+        "T-CM4",
+        "T-CM5",
+        "T-CM6",
+        "T-CM7",
+        "T-CM8"
+      ]
+    },
+    {
+      "id": "PY",
+      "name": "Introduction to Python",
+      "type": "main",
+      "prerequisiteModuleIds": [
+        "FND-COMP"
+      ],
+      "recommendedModuleIds": [
+        "FND-MATH"
+      ],
+      "topicIds": [
+        "T-PY1",
+        "T-PY2",
+        "T-PY3",
+        "T-PY4",
+        "T-PY5"
+      ]
+    },
+    {
+      "id": "JAVA",
+      "name": "Object Oriented Programming with Java",
+      "type": "main",
+      "prerequisiteModuleIds": [
+        "FND-COMP"
+      ],
+      "recommendedModuleIds": [
+        "PY"
+      ],
+      "topicIds": [
+        "T-JV1",
+        "T-JV2",
+        "T-JV3",
+        "T-JV4",
+        "T-JV5"
+      ]
+    },
+    {
+      "id": "DB",
+      "name": "Introduction to Databases",
+      "type": "main",
+      "prerequisiteModuleIds": [
+        "FND-COMP"
+      ],
+      "recommendedModuleIds": [
+        "CM"
+      ],
+      "topicIds": [
+        "T-DB1",
+        "T-DB2",
+        "T-DB3",
+        "T-DB4",
+        "T-DB5"
+      ]
+    }
+  ],
+  "topics": [
+    {
+      "id": "T-FM1",
+      "moduleId": "FND-MATH",
+      "name": "Arithmetic and algebra",
+      "order": 1,
+      "conceptIds": [
+        "FM-ARITH",
+        "FM-ALG",
+        "FM-EXP",
+        "FM-LINE",
+        "FM-QUAD"
+      ]
+    },
+    {
+      "id": "T-FM2",
+      "moduleId": "FND-MATH",
+      "name": "Functions and trigonometry",
+      "order": 2,
+      "conceptIds": [
+        "FM-FUNC",
+        "FM-TRIG"
+      ]
+    },
+    {
+      "id": "T-FM3",
+      "moduleId": "FND-MATH",
+      "name": "Logical reasoning",
+      "order": 3,
+      "conceptIds": [
+        "FM-LOGIC"
+      ]
+    },
+    {
+      "id": "T-FC1",
+      "moduleId": "FND-COMP",
+      "name": "Computer literacy",
+      "order": 4,
+      "conceptIds": [
+        "FC-LIT",
+        "FC-BITS",
+        "FC-TABLES"
+      ]
+    },
+    {
+      "id": "T-FC2",
+      "moduleId": "FND-COMP",
+      "name": "Programming foundations (language independent)",
+      "order": 5,
+      "conceptIds": [
+        "PRG-ALGO",
+        "PRG-VAR",
+        "PRG-TYPE",
+        "PRG-EXPR",
+        "PRG-COND",
+        "PRG-LOOP",
+        "PRG-FUNC",
+        "PRG-COLL",
+        "PRG-TRACE"
+      ]
+    },
+    {
+      "id": "T-CM1",
+      "moduleId": "CM",
+      "name": "Number systems and representation",
+      "order": 6,
+      "conceptIds": [
+        "CM-NUMSYS",
+        "CM-CONV",
+        "CM-BINARITH",
+        "CM-FLOAT"
+      ]
+    },
+    {
+      "id": "T-CM2",
+      "moduleId": "CM",
+      "name": "Logic and Boolean algebra",
+      "order": 7,
+      "conceptIds": [
+        "CM-PROP",
+        "CM-EQUIV",
+        "CM-BOOL",
+        "CM-PRED",
+        "CM-PROOF"
+      ]
+    },
+    {
+      "id": "T-CM3",
+      "moduleId": "CM",
+      "name": "Sets, relations and functions",
+      "order": 8,
+      "conceptIds": [
+        "CM-SETS",
+        "CM-REL",
+        "CM-FUNCSET",
+        "CM-COMP"
+      ]
+    },
+    {
+      "id": "T-CM4",
+      "moduleId": "CM",
+      "name": "Sequences, series and induction",
+      "order": 9,
+      "conceptIds": [
+        "CM-SEQ",
+        "CM-SIGMA",
+        "CM-RECUR",
+        "CM-INDUCT"
+      ]
+    },
+    {
+      "id": "T-CM5",
+      "moduleId": "CM",
+      "name": "Counting, probability and statistics",
+      "order": 10,
+      "conceptIds": [
+        "CM-COUNT",
+        "CM-PROB",
+        "CM-COND",
+        "CM-BAYES",
+        "CM-STAT",
+        "CM-RV",
+        "CM-DIST"
+      ]
+    },
+    {
+      "id": "T-CM6",
+      "moduleId": "CM",
+      "name": "Vectors and matrices",
+      "order": 11,
+      "conceptIds": [
+        "CM-VEC",
+        "CM-MAT",
+        "CM-MATMUL",
+        "CM-DET",
+        "CM-LINSYS"
+      ]
+    },
+    {
+      "id": "T-CM7",
+      "moduleId": "CM",
+      "name": "Calculus",
+      "order": 12,
+      "conceptIds": [
+        "CM-LIM",
+        "CM-DER",
+        "CM-DERRULES",
+        "CM-CHAIN",
+        "CM-OPT",
+        "CM-INTEG",
+        "CM-PARTIAL",
+        "CM-GRADDESC"
+      ]
+    },
+    {
+      "id": "T-CM8",
+      "moduleId": "CM",
+      "name": "Graphs and numerical methods",
+      "order": 13,
+      "conceptIds": [
+        "CM-GRAPH",
+        "CM-TREE",
+        "CM-BIGO",
+        "CM-ROOT"
+      ]
+    },
+    {
+      "id": "T-PY1",
+      "moduleId": "PY",
+      "name": "Getting started with Python",
+      "order": 14,
+      "conceptIds": [
+        "PY-ENV",
+        "PY-SYNTAX",
+        "PY-VAR",
+        "PY-TYPES",
+        "PY-IO",
+        "PY-OPS"
+      ]
+    },
+    {
+      "id": "T-PY2",
+      "moduleId": "PY",
+      "name": "Control flow",
+      "order": 15,
+      "conceptIds": [
+        "PY-IF",
+        "PY-WHILE",
+        "PY-FOR",
+        "PY-NEST"
+      ]
+    },
+    {
+      "id": "T-PY3",
+      "moduleId": "PY",
+      "name": "Data structures",
+      "order": 16,
+      "conceptIds": [
+        "PY-STR",
+        "PY-LIST",
+        "PY-TUPLE",
+        "PY-DICT",
+        "PY-SET",
+        "PY-COMP"
+      ]
+    },
+    {
+      "id": "T-PY4",
+      "moduleId": "PY",
+      "name": "Functions and modules",
+      "order": 17,
+      "conceptIds": [
+        "PY-FUNC",
+        "PY-PARAM",
+        "PY-SCOPE",
+        "PY-RECUR",
+        "PY-MOD"
+      ]
+    },
+    {
+      "id": "T-PY5",
+      "moduleId": "PY",
+      "name": "Files, errors and problem solving",
+      "order": 18,
+      "conceptIds": [
+        "PY-FILE",
+        "PY-EXC",
+        "PY-DEBUG",
+        "PY-SORT",
+        "PY-DECOMP"
+      ]
+    },
+    {
+      "id": "T-JV1",
+      "moduleId": "JAVA",
+      "name": "Java fundamentals",
+      "order": 19,
+      "conceptIds": [
+        "JV-ENV",
+        "JV-SYNTAX",
+        "JV-VAR",
+        "JV-OPS",
+        "JV-IO"
+      ]
+    },
+    {
+      "id": "T-JV2",
+      "moduleId": "JAVA",
+      "name": "Control flow, arrays and methods",
+      "order": 20,
+      "conceptIds": [
+        "JV-IF",
+        "JV-LOOP",
+        "JV-ARRAY",
+        "JV-STR",
+        "JV-METH"
+      ]
+    },
+    {
+      "id": "T-JV3",
+      "moduleId": "JAVA",
+      "name": "Classes and objects",
+      "order": 21,
+      "conceptIds": [
+        "JV-CLASS",
+        "JV-ENCAP",
+        "JV-STATIC",
+        "JV-REF",
+        "JV-TOSTR"
+      ]
+    },
+    {
+      "id": "T-JV4",
+      "moduleId": "JAVA",
+      "name": "Inheritance, polymorphism and design",
+      "order": 22,
+      "conceptIds": [
+        "JV-INHER",
+        "JV-POLY",
+        "JV-ABS",
+        "JV-IFACE",
+        "JV-UML"
+      ]
+    },
+    {
+      "id": "T-JV5",
+      "moduleId": "JAVA",
+      "name": "Collections, exceptions and files",
+      "order": 23,
+      "conceptIds": [
+        "JV-LIST",
+        "JV-MAP",
+        "JV-EXC",
+        "JV-FILE",
+        "JV-GUI"
+      ]
+    },
+    {
+      "id": "T-DB1",
+      "moduleId": "DB",
+      "name": "Database fundamentals",
+      "order": 24,
+      "conceptIds": [
+        "DB-WHY",
+        "DB-MODEL",
+        "DB-KEYS",
+        "DB-TYPES"
+      ]
+    },
+    {
+      "id": "T-DB2",
+      "moduleId": "DB",
+      "name": "Data modelling",
+      "order": 25,
+      "conceptIds": [
+        "DB-ER",
+        "DB-CARD",
+        "DB-ERD",
+        "DB-INTEG"
+      ]
+    },
+    {
+      "id": "T-DB3",
+      "moduleId": "DB",
+      "name": "Normalisation",
+      "order": 26,
+      "conceptIds": [
+        "DB-ANOM",
+        "DB-FD",
+        "DB-1NF",
+        "DB-2NF",
+        "DB-3NF"
+      ]
+    },
+    {
+      "id": "T-DB4",
+      "moduleId": "DB",
+      "name": "SQL",
+      "order": 27,
+      "conceptIds": [
+        "DB-SELECT",
+        "DB-FILTER",
+        "DB-AGG",
+        "DB-JOIN",
+        "DB-SETOPS",
+        "DB-SUBQ",
+        "DB-DDL",
+        "DB-DML"
+      ]
+    },
+    {
+      "id": "T-DB5",
+      "moduleId": "DB",
+      "name": "Beyond the basics",
+      "order": 28,
+      "conceptIds": [
+        "DB-RELALG",
+        "DB-VIEW",
+        "DB-TXN",
+        "DB-SEC",
+        "DB-APP"
+      ]
+    }
+  ],
+  "concepts": [
+    {
+      "id": "FM-ARITH",
+      "name": "Arithmetic and order of operations",
+      "description": "Fractions, percentages, decimals and BODMAS order of operations.",
+      "moduleId": "FND-MATH",
+      "topicId": "T-FM1",
+      "level": "foundation",
+      "optional": false,
+      "prerequisites": [],
+      "related": [],
+      "depth": 0
+    },
+    {
+      "id": "FM-ALG",
+      "name": "Algebraic manipulation",
+      "description": "Simplifying expressions and solving linear equations.",
+      "moduleId": "FND-MATH",
+      "topicId": "T-FM1",
+      "level": "foundation",
+      "optional": false,
+      "prerequisites": [
+        "FM-ARITH"
+      ],
+      "related": [],
+      "depth": 1
+    },
+    {
+      "id": "FM-EXP",
+      "name": "Exponents and logarithms",
+      "description": "Powers, roots, index laws and logarithm rules.",
+      "moduleId": "FND-MATH",
+      "topicId": "T-FM1",
+      "level": "foundation",
+      "optional": false,
+      "prerequisites": [
+        "FM-ALG"
+      ],
+      "related": [],
+      "depth": 2
+    },
+    {
+      "id": "FM-LINE",
+      "name": "Straight lines and linear equations",
+      "description": "Gradient, intercepts and graphing y = mx + c.",
+      "moduleId": "FND-MATH",
+      "topicId": "T-FM1",
+      "level": "foundation",
+      "optional": false,
+      "prerequisites": [
+        "FM-ALG"
+      ],
+      "related": [],
+      "depth": 2
+    },
+    {
+      "id": "FM-QUAD",
+      "name": "Quadratics",
+      "description": "Factorising, completing the square and the quadratic formula.",
+      "moduleId": "FND-MATH",
+      "topicId": "T-FM1",
+      "level": "foundation",
+      "optional": false,
+      "prerequisites": [
+        "FM-ALG"
+      ],
+      "related": [],
+      "depth": 2
+    },
+    {
+      "id": "FM-FUNC",
+      "name": "Functions and graphs",
+      "description": "Function notation, domain, range and plotting graphs.",
+      "moduleId": "FND-MATH",
+      "topicId": "T-FM2",
+      "level": "foundation",
+      "optional": false,
+      "prerequisites": [
+        "FM-ALG",
+        "FM-LINE"
+      ],
+      "related": [],
+      "depth": 3
+    },
+    {
+      "id": "FM-TRIG",
+      "name": "Basic trigonometry",
+      "description": "Sine, cosine, tangent and the unit circle.",
+      "moduleId": "FND-MATH",
+      "topicId": "T-FM2",
+      "level": "foundation",
+      "optional": false,
+      "prerequisites": [
+        "FM-FUNC"
+      ],
+      "related": [],
+      "depth": 4
+    },
+    {
+      "id": "FM-LOGIC",
+      "name": "Everyday logic",
+      "description": "Using and, or, not and if-then statements correctly.",
+      "moduleId": "FND-MATH",
+      "topicId": "T-FM3",
+      "level": "foundation",
+      "optional": false,
+      "prerequisites": [],
+      "related": [],
+      "depth": 0
+    },
+    {
+      "id": "FC-LIT",
+      "name": "Using a computer",
+      "description": "Files, folders, terminal basics, text editors and IDEs.",
+      "moduleId": "FND-COMP",
+      "topicId": "T-FC1",
+      "level": "foundation",
+      "optional": false,
+      "prerequisites": [],
+      "related": [],
+      "depth": 0
+    },
+    {
+      "id": "FC-BITS",
+      "name": "How computers store data",
+      "description": "Bits, bytes and the idea that text and numbers are stored as binary.",
+      "moduleId": "FND-COMP",
+      "topicId": "T-FC1",
+      "level": "foundation",
+      "optional": false,
+      "prerequisites": [
+        "FC-LIT"
+      ],
+      "related": [],
+      "depth": 1
+    },
+    {
+      "id": "FC-TABLES",
+      "name": "Structured data",
+      "description": "Rows, columns, tables and spreadsheet-style data.",
+      "moduleId": "FND-COMP",
+      "topicId": "T-FC1",
+      "level": "foundation",
+      "optional": false,
+      "prerequisites": [
+        "FC-LIT"
+      ],
+      "related": [],
+      "depth": 1
+    },
+    {
+      "id": "PRG-ALGO",
+      "name": "Algorithms and decomposition",
+      "description": "Breaking a problem into steps using pseudocode or flowcharts.",
+      "moduleId": "FND-COMP",
+      "topicId": "T-FC2",
+      "level": "foundation",
+      "optional": false,
+      "prerequisites": [
+        "FM-LOGIC"
+      ],
+      "related": [],
+      "depth": 1
+    },
+    {
+      "id": "PRG-VAR",
+      "name": "Variables and assignment",
+      "description": "Storing, reading and updating values in named variables.",
+      "moduleId": "FND-COMP",
+      "topicId": "T-FC2",
+      "level": "foundation",
+      "optional": false,
+      "prerequisites": [
+        "FC-LIT"
+      ],
+      "related": [
+        "FM-ALG"
+      ],
+      "depth": 1
+    },
+    {
+      "id": "PRG-TYPE",
+      "name": "Data types",
+      "description": "Numbers, text and booleans, and why types matter.",
+      "moduleId": "FND-COMP",
+      "topicId": "T-FC2",
+      "level": "foundation",
+      "optional": false,
+      "prerequisites": [
+        "PRG-VAR"
+      ],
+      "related": [],
+      "depth": 2
+    },
+    {
+      "id": "PRG-EXPR",
+      "name": "Expressions and operators",
+      "description": "Arithmetic, comparison and logical operators and precedence.",
+      "moduleId": "FND-COMP",
+      "topicId": "T-FC2",
+      "level": "foundation",
+      "optional": false,
+      "prerequisites": [
+        "PRG-TYPE",
+        "FM-ARITH",
+        "FM-LOGIC"
+      ],
+      "related": [],
+      "depth": 3
+    },
+    {
+      "id": "PRG-COND",
+      "name": "Selection",
+      "description": "Making decisions with if / else logic.",
+      "moduleId": "FND-COMP",
+      "topicId": "T-FC2",
+      "level": "foundation",
+      "optional": false,
+      "prerequisites": [
+        "PRG-EXPR"
+      ],
+      "related": [],
+      "depth": 4
+    },
+    {
+      "id": "PRG-LOOP",
+      "name": "Iteration",
+      "description": "Repeating steps with loops and loop conditions.",
+      "moduleId": "FND-COMP",
+      "topicId": "T-FC2",
+      "level": "foundation",
+      "optional": false,
+      "prerequisites": [
+        "PRG-COND"
+      ],
+      "related": [],
+      "depth": 5
+    },
+    {
+      "id": "PRG-FUNC",
+      "name": "Subprograms",
+      "description": "Functions or methods, parameters and return values.",
+      "moduleId": "FND-COMP",
+      "topicId": "T-FC2",
+      "level": "foundation",
+      "optional": false,
+      "prerequisites": [
+        "PRG-VAR",
+        "PRG-COND"
+      ],
+      "related": [],
+      "depth": 5
+    },
+    {
+      "id": "PRG-COLL",
+      "name": "Collections",
+      "description": "Arrays or lists of values and indexing from zero.",
+      "moduleId": "FND-COMP",
+      "topicId": "T-FC2",
+      "level": "foundation",
+      "optional": false,
+      "prerequisites": [
+        "PRG-TYPE",
+        "PRG-LOOP"
+      ],
+      "related": [],
+      "depth": 6
+    },
+    {
+      "id": "PRG-TRACE",
+      "name": "Tracing and debugging",
+      "description": "Following code by hand and reading error messages.",
+      "moduleId": "FND-COMP",
+      "topicId": "T-FC2",
+      "level": "foundation",
+      "optional": false,
+      "prerequisites": [
+        "PRG-VAR",
+        "PRG-COND"
+      ],
+      "related": [],
+      "depth": 5
+    },
+    {
+      "id": "CM-NUMSYS",
+      "name": "Number systems",
+      "description": "Decimal, binary, octal and hexadecimal place value.",
+      "moduleId": "CM",
+      "topicId": "T-CM1",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "FM-ARITH",
+        "FM-EXP",
+        "FC-BITS"
+      ],
+      "related": [],
+      "depth": 3
+    },
+    {
+      "id": "CM-CONV",
+      "name": "Base conversion",
+      "description": "Converting numbers between decimal, binary, octal and hex.",
+      "moduleId": "CM",
+      "topicId": "T-CM1",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "CM-NUMSYS"
+      ],
+      "related": [],
+      "depth": 4
+    },
+    {
+      "id": "CM-BINARITH",
+      "name": "Binary arithmetic and two's complement",
+      "description": "Adding and subtracting binary numbers and negative representation.",
+      "moduleId": "CM",
+      "topicId": "T-CM1",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "CM-CONV"
+      ],
+      "related": [],
+      "depth": 5
+    },
+    {
+      "id": "CM-FLOAT",
+      "name": "Floating-point and rounding error",
+      "description": "How real numbers are approximated and where error comes from.",
+      "moduleId": "CM",
+      "topicId": "T-CM1",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "CM-BINARITH"
+      ],
+      "related": [],
+      "depth": 6
+    },
+    {
+      "id": "CM-PROP",
+      "name": "Propositional logic",
+      "description": "Propositions, connectives and truth tables.",
+      "moduleId": "CM",
+      "topicId": "T-CM2",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "FM-LOGIC"
+      ],
+      "related": [],
+      "depth": 1
+    },
+    {
+      "id": "CM-EQUIV",
+      "name": "Logical equivalence",
+      "description": "De Morgan's laws, equivalence rules and simplifying statements.",
+      "moduleId": "CM",
+      "topicId": "T-CM2",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "CM-PROP"
+      ],
+      "related": [],
+      "depth": 2
+    },
+    {
+      "id": "CM-BOOL",
+      "name": "Boolean algebra and logic gates",
+      "description": "Boolean expressions, simplification and gate circuits.",
+      "moduleId": "CM",
+      "topicId": "T-CM2",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "CM-EQUIV"
+      ],
+      "related": [],
+      "depth": 3
+    },
+    {
+      "id": "CM-PRED",
+      "name": "Predicate logic",
+      "description": "Quantifiers: for all and there exists.",
+      "moduleId": "CM",
+      "topicId": "T-CM2",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "CM-PROP",
+        "CM-SETS"
+      ],
+      "related": [],
+      "depth": 2
+    },
+    {
+      "id": "CM-PROOF",
+      "name": "Proof techniques",
+      "description": "Direct proof, proof by contradiction and counterexamples.",
+      "moduleId": "CM",
+      "topicId": "T-CM2",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "CM-EQUIV"
+      ],
+      "related": [],
+      "depth": 3
+    },
+    {
+      "id": "CM-SETS",
+      "name": "Sets",
+      "description": "Set notation, subsets, union, intersection and Venn diagrams.",
+      "moduleId": "CM",
+      "topicId": "T-CM3",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "FM-LOGIC"
+      ],
+      "related": [],
+      "depth": 1
+    },
+    {
+      "id": "CM-REL",
+      "name": "Relations",
+      "description": "Ordered pairs and reflexive, symmetric and transitive properties.",
+      "moduleId": "CM",
+      "topicId": "T-CM3",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "CM-SETS"
+      ],
+      "related": [],
+      "depth": 2
+    },
+    {
+      "id": "CM-FUNCSET",
+      "name": "Functions as mappings",
+      "description": "Injective, surjective and bijective functions.",
+      "moduleId": "CM",
+      "topicId": "T-CM3",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "CM-SETS",
+        "FM-FUNC"
+      ],
+      "related": [],
+      "depth": 4
+    },
+    {
+      "id": "CM-COMP",
+      "name": "Composition and inverse of functions",
+      "description": "Composing functions f(g(x)) and finding inverses.",
+      "moduleId": "CM",
+      "topicId": "T-CM3",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "CM-FUNCSET"
+      ],
+      "related": [],
+      "depth": 5
+    },
+    {
+      "id": "CM-SEQ",
+      "name": "Arithmetic and geometric sequences",
+      "description": "General terms and patterns of sequences.",
+      "moduleId": "CM",
+      "topicId": "T-CM4",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "FM-ALG",
+        "FM-EXP"
+      ],
+      "related": [],
+      "depth": 3
+    },
+    {
+      "id": "CM-SIGMA",
+      "name": "Summation notation and series",
+      "description": "Sigma notation and sums of series.",
+      "moduleId": "CM",
+      "topicId": "T-CM4",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "CM-SEQ"
+      ],
+      "related": [],
+      "depth": 4
+    },
+    {
+      "id": "CM-RECUR",
+      "name": "Recurrence relations",
+      "description": "Defining a sequence in terms of earlier terms.",
+      "moduleId": "CM",
+      "topicId": "T-CM4",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "CM-SEQ"
+      ],
+      "related": [],
+      "depth": 4
+    },
+    {
+      "id": "CM-INDUCT",
+      "name": "Mathematical induction",
+      "description": "Proving statements for all natural numbers.",
+      "moduleId": "CM",
+      "topicId": "T-CM4",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "CM-SIGMA",
+        "CM-PROP"
+      ],
+      "related": [
+        "CM-RECUR"
+      ],
+      "depth": 5
+    },
+    {
+      "id": "CM-COUNT",
+      "name": "Counting principles",
+      "description": "Permutations, combinations and the multiplication rule.",
+      "moduleId": "CM",
+      "topicId": "T-CM5",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "FM-ARITH",
+        "CM-SETS"
+      ],
+      "related": [],
+      "depth": 2
+    },
+    {
+      "id": "CM-PROB",
+      "name": "Basic probability",
+      "description": "Sample space, events and probability rules.",
+      "moduleId": "CM",
+      "topicId": "T-CM5",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "CM-COUNT",
+        "CM-SETS"
+      ],
+      "related": [],
+      "depth": 3
+    },
+    {
+      "id": "CM-COND",
+      "name": "Conditional probability and independence",
+      "description": "P(A given B) and independent events.",
+      "moduleId": "CM",
+      "topicId": "T-CM5",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "CM-PROB"
+      ],
+      "related": [],
+      "depth": 4
+    },
+    {
+      "id": "CM-BAYES",
+      "name": "Bayes' theorem",
+      "description": "Updating probabilities with new evidence.",
+      "moduleId": "CM",
+      "topicId": "T-CM5",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "CM-COND"
+      ],
+      "related": [],
+      "depth": 5
+    },
+    {
+      "id": "CM-STAT",
+      "name": "Descriptive statistics",
+      "description": "Mean, median, variance and standard deviation.",
+      "moduleId": "CM",
+      "topicId": "T-CM5",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "FM-ALG"
+      ],
+      "related": [],
+      "depth": 2
+    },
+    {
+      "id": "CM-RV",
+      "name": "Random variables and expected value",
+      "description": "Distributions of outcomes and expectation.",
+      "moduleId": "CM",
+      "topicId": "T-CM5",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "CM-PROB",
+        "CM-STAT"
+      ],
+      "related": [],
+      "depth": 4
+    },
+    {
+      "id": "CM-DIST",
+      "name": "Common distributions",
+      "description": "Binomial and normal distributions.",
+      "moduleId": "CM",
+      "topicId": "T-CM5",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "CM-RV"
+      ],
+      "related": [],
+      "depth": 5
+    },
+    {
+      "id": "CM-VEC",
+      "name": "Vectors",
+      "description": "Components, magnitude and the dot product.",
+      "moduleId": "CM",
+      "topicId": "T-CM6",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "FM-ALG",
+        "FM-TRIG"
+      ],
+      "related": [],
+      "depth": 5
+    },
+    {
+      "id": "CM-MAT",
+      "name": "Matrices",
+      "description": "Matrix notation, addition and scalar multiplication.",
+      "moduleId": "CM",
+      "topicId": "T-CM6",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "FM-ALG"
+      ],
+      "related": [],
+      "depth": 2
+    },
+    {
+      "id": "CM-MATMUL",
+      "name": "Matrix multiplication",
+      "description": "Row-by-column multiplication and dimension rules.",
+      "moduleId": "CM",
+      "topicId": "T-CM6",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "CM-MAT",
+        "CM-VEC"
+      ],
+      "related": [],
+      "depth": 6
+    },
+    {
+      "id": "CM-DET",
+      "name": "Determinants and inverse matrices",
+      "description": "Computing determinants and inverting matrices.",
+      "moduleId": "CM",
+      "topicId": "T-CM6",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "CM-MATMUL"
+      ],
+      "related": [],
+      "depth": 7
+    },
+    {
+      "id": "CM-LINSYS",
+      "name": "Systems of linear equations",
+      "description": "Solving systems with Gaussian elimination.",
+      "moduleId": "CM",
+      "topicId": "T-CM6",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "FM-LINE",
+        "CM-MAT"
+      ],
+      "related": [],
+      "depth": 3
+    },
+    {
+      "id": "CM-LIM",
+      "name": "Limits and continuity",
+      "description": "Intuition for limits and continuous functions.",
+      "moduleId": "CM",
+      "topicId": "T-CM7",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "FM-FUNC"
+      ],
+      "related": [],
+      "depth": 4
+    },
+    {
+      "id": "CM-DER",
+      "name": "Derivatives",
+      "description": "Rate of change and the power rule.",
+      "moduleId": "CM",
+      "topicId": "T-CM7",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "CM-LIM"
+      ],
+      "related": [],
+      "depth": 5
+    },
+    {
+      "id": "CM-DERRULES",
+      "name": "Product and quotient rules",
+      "description": "Differentiating products and quotients of functions.",
+      "moduleId": "CM",
+      "topicId": "T-CM7",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "CM-DER"
+      ],
+      "related": [],
+      "depth": 6
+    },
+    {
+      "id": "CM-CHAIN",
+      "name": "Chain rule",
+      "description": "Differentiating composite functions.",
+      "moduleId": "CM",
+      "topicId": "T-CM7",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "CM-DER",
+        "CM-COMP"
+      ],
+      "related": [],
+      "depth": 6
+    },
+    {
+      "id": "CM-OPT",
+      "name": "Optimisation",
+      "description": "Stationary points and finding maxima and minima.",
+      "moduleId": "CM",
+      "topicId": "T-CM7",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "CM-DER",
+        "FM-QUAD"
+      ],
+      "related": [],
+      "depth": 6
+    },
+    {
+      "id": "CM-INTEG",
+      "name": "Integration basics",
+      "description": "Antiderivatives and area under a curve.",
+      "moduleId": "CM",
+      "topicId": "T-CM7",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "CM-DER"
+      ],
+      "related": [],
+      "depth": 6
+    },
+    {
+      "id": "CM-PARTIAL",
+      "name": "Partial derivatives and gradient",
+      "description": "Derivatives of functions of several variables.",
+      "moduleId": "CM",
+      "topicId": "T-CM7",
+      "level": "extension",
+      "optional": true,
+      "prerequisites": [
+        "CM-CHAIN",
+        "CM-VEC"
+      ],
+      "related": [],
+      "depth": 7
+    },
+    {
+      "id": "CM-GRADDESC",
+      "name": "Gradient descent",
+      "description": "Minimising a function by stepping against the gradient.",
+      "moduleId": "CM",
+      "topicId": "T-CM7",
+      "level": "extension",
+      "optional": true,
+      "prerequisites": [
+        "CM-PARTIAL",
+        "CM-OPT"
+      ],
+      "related": [],
+      "depth": 8
+    },
+    {
+      "id": "CM-GRAPH",
+      "name": "Graph theory basics",
+      "description": "Vertices, edges, degree and paths.",
+      "moduleId": "CM",
+      "topicId": "T-CM8",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "CM-SETS",
+        "CM-REL"
+      ],
+      "related": [],
+      "depth": 3
+    },
+    {
+      "id": "CM-TREE",
+      "name": "Trees and traversal",
+      "description": "Trees as graphs and ways to traverse them.",
+      "moduleId": "CM",
+      "topicId": "T-CM8",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "CM-GRAPH"
+      ],
+      "related": [],
+      "depth": 4
+    },
+    {
+      "id": "CM-BIGO",
+      "name": "Growth of functions and Big-O",
+      "description": "Comparing how quickly functions grow.",
+      "moduleId": "CM",
+      "topicId": "T-CM8",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "FM-FUNC",
+        "FM-EXP"
+      ],
+      "related": [],
+      "depth": 4
+    },
+    {
+      "id": "CM-ROOT",
+      "name": "Root finding",
+      "description": "Bisection and Newton's method.",
+      "moduleId": "CM",
+      "topicId": "T-CM8",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "CM-DER",
+        "CM-FLOAT"
+      ],
+      "related": [],
+      "depth": 7
+    },
+    {
+      "id": "PY-ENV",
+      "name": "Running Python",
+      "description": "Interpreter, scripts and using an IDE.",
+      "moduleId": "PY",
+      "topicId": "T-PY1",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "FC-LIT"
+      ],
+      "related": [],
+      "depth": 1
+    },
+    {
+      "id": "PY-SYNTAX",
+      "name": "Python syntax",
+      "description": "Indentation, comments and statements.",
+      "moduleId": "PY",
+      "topicId": "T-PY1",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "PY-ENV"
+      ],
+      "related": [],
+      "depth": 2
+    },
+    {
+      "id": "PY-VAR",
+      "name": "Variables in Python",
+      "description": "Assignment and naming in Python.",
+      "moduleId": "PY",
+      "topicId": "T-PY1",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "PRG-VAR",
+        "PY-SYNTAX"
+      ],
+      "related": [],
+      "depth": 3
+    },
+    {
+      "id": "PY-TYPES",
+      "name": "Built-in types and conversion",
+      "description": "int, float, str, bool and type conversion.",
+      "moduleId": "PY",
+      "topicId": "T-PY1",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "PY-VAR",
+        "PRG-TYPE"
+      ],
+      "related": [],
+      "depth": 4
+    },
+    {
+      "id": "PY-IO",
+      "name": "Input and output",
+      "description": "print(), input() and f-strings.",
+      "moduleId": "PY",
+      "topicId": "T-PY1",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "PY-TYPES"
+      ],
+      "related": [],
+      "depth": 5
+    },
+    {
+      "id": "PY-OPS",
+      "name": "Operators",
+      "description": "Arithmetic, comparison and logical operators and precedence.",
+      "moduleId": "PY",
+      "topicId": "T-PY1",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "PY-TYPES",
+        "PRG-EXPR"
+      ],
+      "related": [],
+      "depth": 5
+    },
+    {
+      "id": "PY-IF",
+      "name": "Conditionals",
+      "description": "if, elif and else.",
+      "moduleId": "PY",
+      "topicId": "T-PY2",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "PY-OPS",
+        "PRG-COND"
+      ],
+      "related": [],
+      "depth": 6
+    },
+    {
+      "id": "PY-WHILE",
+      "name": "While loops",
+      "description": "Loop conditions and avoiding infinite loops.",
+      "moduleId": "PY",
+      "topicId": "T-PY2",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "PY-IF",
+        "PRG-LOOP"
+      ],
+      "related": [],
+      "depth": 7
+    },
+    {
+      "id": "PY-FOR",
+      "name": "For loops and range",
+      "description": "Iterating with for and range().",
+      "moduleId": "PY",
+      "topicId": "T-PY2",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "PY-IF",
+        "PRG-LOOP"
+      ],
+      "related": [],
+      "depth": 7
+    },
+    {
+      "id": "PY-NEST",
+      "name": "Nested loops and loop control",
+      "description": "Nested structures, break and continue.",
+      "moduleId": "PY",
+      "topicId": "T-PY2",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "PY-WHILE",
+        "PY-FOR"
+      ],
+      "related": [],
+      "depth": 8
+    },
+    {
+      "id": "PY-STR",
+      "name": "Strings",
+      "description": "String methods, indexing and slicing.",
+      "moduleId": "PY",
+      "topicId": "T-PY3",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "PY-TYPES",
+        "PY-FOR"
+      ],
+      "related": [],
+      "depth": 8
+    },
+    {
+      "id": "PY-LIST",
+      "name": "Lists",
+      "description": "Creating, indexing, slicing and modifying lists.",
+      "moduleId": "PY",
+      "topicId": "T-PY3",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "PY-FOR",
+        "PRG-COLL"
+      ],
+      "related": [],
+      "depth": 8
+    },
+    {
+      "id": "PY-TUPLE",
+      "name": "Tuples and immutability",
+      "description": "Fixed sequences and why immutability matters.",
+      "moduleId": "PY",
+      "topicId": "T-PY3",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "PY-LIST"
+      ],
+      "related": [],
+      "depth": 9
+    },
+    {
+      "id": "PY-DICT",
+      "name": "Dictionaries",
+      "description": "Key-value pairs and lookup.",
+      "moduleId": "PY",
+      "topicId": "T-PY3",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "PY-LIST"
+      ],
+      "related": [],
+      "depth": 9
+    },
+    {
+      "id": "PY-SET",
+      "name": "Sets",
+      "description": "Unique collections and membership tests.",
+      "moduleId": "PY",
+      "topicId": "T-PY3",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "PY-LIST"
+      ],
+      "related": [
+        "CM-SETS"
+      ],
+      "depth": 9
+    },
+    {
+      "id": "PY-COMP",
+      "name": "List comprehensions",
+      "description": "Building lists in one expression.",
+      "moduleId": "PY",
+      "topicId": "T-PY3",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "PY-LIST",
+        "PY-FOR"
+      ],
+      "related": [],
+      "depth": 9
+    },
+    {
+      "id": "PY-FUNC",
+      "name": "Defining and calling functions",
+      "description": "def, calling and reuse.",
+      "moduleId": "PY",
+      "topicId": "T-PY4",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "PY-IF",
+        "PRG-FUNC"
+      ],
+      "related": [],
+      "depth": 7
+    },
+    {
+      "id": "PY-PARAM",
+      "name": "Parameters and return values",
+      "description": "Arguments, defaults and return.",
+      "moduleId": "PY",
+      "topicId": "T-PY4",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "PY-FUNC"
+      ],
+      "related": [],
+      "depth": 8
+    },
+    {
+      "id": "PY-SCOPE",
+      "name": "Variable scope",
+      "description": "Local versus global variables.",
+      "moduleId": "PY",
+      "topicId": "T-PY4",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "PY-FUNC"
+      ],
+      "related": [],
+      "depth": 8
+    },
+    {
+      "id": "PY-RECUR",
+      "name": "Recursion",
+      "description": "Functions that call themselves with a base case.",
+      "moduleId": "PY",
+      "topicId": "T-PY4",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "PY-PARAM",
+        "PY-IF"
+      ],
+      "related": [
+        "CM-RECUR",
+        "CM-INDUCT"
+      ],
+      "depth": 9
+    },
+    {
+      "id": "PY-MOD",
+      "name": "Modules and the standard library",
+      "description": "Importing and using modules.",
+      "moduleId": "PY",
+      "topicId": "T-PY4",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "PY-FUNC"
+      ],
+      "related": [],
+      "depth": 8
+    },
+    {
+      "id": "PY-FILE",
+      "name": "File handling",
+      "description": "Reading and writing text files.",
+      "moduleId": "PY",
+      "topicId": "T-PY5",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "PY-IO",
+        "PY-FOR",
+        "PY-STR"
+      ],
+      "related": [],
+      "depth": 9
+    },
+    {
+      "id": "PY-EXC",
+      "name": "Exceptions",
+      "description": "try and except for handling errors.",
+      "moduleId": "PY",
+      "topicId": "T-PY5",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "PY-IF",
+        "PY-FUNC"
+      ],
+      "related": [],
+      "depth": 8
+    },
+    {
+      "id": "PY-DEBUG",
+      "name": "Debugging and testing",
+      "description": "Reading tracebacks and testing with assert.",
+      "moduleId": "PY",
+      "topicId": "T-PY5",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "PY-FUNC",
+        "PRG-TRACE"
+      ],
+      "related": [],
+      "depth": 8
+    },
+    {
+      "id": "PY-SORT",
+      "name": "Searching and sorting",
+      "description": "Linear and binary search, and basic sorts.",
+      "moduleId": "PY",
+      "topicId": "T-PY5",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "PY-LIST",
+        "PY-NEST"
+      ],
+      "related": [
+        "CM-BIGO"
+      ],
+      "depth": 9
+    },
+    {
+      "id": "PY-DECOMP",
+      "name": "Problem decomposition",
+      "description": "Splitting a larger problem into functions.",
+      "moduleId": "PY",
+      "topicId": "T-PY5",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "PY-PARAM",
+        "PY-FILE",
+        "PRG-ALGO"
+      ],
+      "related": [],
+      "depth": 10
+    },
+    {
+      "id": "JV-ENV",
+      "name": "JDK, JVM and compiling",
+      "description": "Compiling and running Java programs.",
+      "moduleId": "JAVA",
+      "topicId": "T-JV1",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "FC-LIT"
+      ],
+      "related": [],
+      "depth": 1
+    },
+    {
+      "id": "JV-SYNTAX",
+      "name": "Java program structure",
+      "description": "Class, main method, statements and semicolons.",
+      "moduleId": "JAVA",
+      "topicId": "T-JV1",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "JV-ENV"
+      ],
+      "related": [],
+      "depth": 2
+    },
+    {
+      "id": "JV-VAR",
+      "name": "Typed variables and primitives",
+      "description": "Declaring typed variables and primitive types.",
+      "moduleId": "JAVA",
+      "topicId": "T-JV1",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "JV-SYNTAX",
+        "PRG-VAR",
+        "PRG-TYPE"
+      ],
+      "related": [],
+      "depth": 3
+    },
+    {
+      "id": "JV-OPS",
+      "name": "Operators and casting",
+      "description": "Operators, casting and string concatenation.",
+      "moduleId": "JAVA",
+      "topicId": "T-JV1",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "JV-VAR",
+        "PRG-EXPR"
+      ],
+      "related": [],
+      "depth": 4
+    },
+    {
+      "id": "JV-IO",
+      "name": "Console input and output",
+      "description": "System.out and Scanner.",
+      "moduleId": "JAVA",
+      "topicId": "T-JV1",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "JV-VAR"
+      ],
+      "related": [],
+      "depth": 4
+    },
+    {
+      "id": "JV-IF",
+      "name": "Conditionals",
+      "description": "if/else and switch.",
+      "moduleId": "JAVA",
+      "topicId": "T-JV2",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "JV-OPS",
+        "PRG-COND"
+      ],
+      "related": [],
+      "depth": 5
+    },
+    {
+      "id": "JV-LOOP",
+      "name": "Loops",
+      "description": "for, while and do-while.",
+      "moduleId": "JAVA",
+      "topicId": "T-JV2",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "JV-IF",
+        "PRG-LOOP"
+      ],
+      "related": [],
+      "depth": 6
+    },
+    {
+      "id": "JV-ARRAY",
+      "name": "Arrays",
+      "description": "Declaring, indexing and iterating arrays.",
+      "moduleId": "JAVA",
+      "topicId": "T-JV2",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "JV-LOOP",
+        "PRG-COLL"
+      ],
+      "related": [],
+      "depth": 7
+    },
+    {
+      "id": "JV-STR",
+      "name": "Strings",
+      "description": "The String class and its methods.",
+      "moduleId": "JAVA",
+      "topicId": "T-JV2",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "JV-OPS",
+        "JV-LOOP"
+      ],
+      "related": [],
+      "depth": 7
+    },
+    {
+      "id": "JV-METH",
+      "name": "Methods",
+      "description": "Parameters, return types and overloading.",
+      "moduleId": "JAVA",
+      "topicId": "T-JV2",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "JV-IF",
+        "PRG-FUNC"
+      ],
+      "related": [],
+      "depth": 6
+    },
+    {
+      "id": "JV-CLASS",
+      "name": "Classes and objects",
+      "description": "Fields, constructors and instances.",
+      "moduleId": "JAVA",
+      "topicId": "T-JV3",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "JV-METH",
+        "JV-VAR"
+      ],
+      "related": [],
+      "depth": 7
+    },
+    {
+      "id": "JV-ENCAP",
+      "name": "Encapsulation",
+      "description": "Access modifiers, getters and setters.",
+      "moduleId": "JAVA",
+      "topicId": "T-JV3",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "JV-CLASS"
+      ],
+      "related": [],
+      "depth": 8
+    },
+    {
+      "id": "JV-STATIC",
+      "name": "Static members and this",
+      "description": "Class-level members and the this keyword.",
+      "moduleId": "JAVA",
+      "topicId": "T-JV3",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "JV-CLASS"
+      ],
+      "related": [],
+      "depth": 8
+    },
+    {
+      "id": "JV-REF",
+      "name": "References and null",
+      "description": "Reference vs primitive types, null and object identity.",
+      "moduleId": "JAVA",
+      "topicId": "T-JV3",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "JV-CLASS",
+        "JV-ARRAY"
+      ],
+      "related": [],
+      "depth": 8
+    },
+    {
+      "id": "JV-TOSTR",
+      "name": "toString and equals",
+      "description": "Overriding Object methods.",
+      "moduleId": "JAVA",
+      "topicId": "T-JV3",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "JV-REF",
+        "JV-STR"
+      ],
+      "related": [],
+      "depth": 9
+    },
+    {
+      "id": "JV-INHER",
+      "name": "Inheritance",
+      "description": "extends, super and method overriding.",
+      "moduleId": "JAVA",
+      "topicId": "T-JV4",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "JV-ENCAP"
+      ],
+      "related": [],
+      "depth": 9
+    },
+    {
+      "id": "JV-POLY",
+      "name": "Polymorphism",
+      "description": "Dynamic dispatch and upcasting.",
+      "moduleId": "JAVA",
+      "topicId": "T-JV4",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "JV-INHER",
+        "JV-REF"
+      ],
+      "related": [],
+      "depth": 10
+    },
+    {
+      "id": "JV-ABS",
+      "name": "Abstract classes",
+      "description": "Abstract methods and partial implementations.",
+      "moduleId": "JAVA",
+      "topicId": "T-JV4",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "JV-INHER"
+      ],
+      "related": [],
+      "depth": 10
+    },
+    {
+      "id": "JV-IFACE",
+      "name": "Interfaces",
+      "description": "Contracts that classes implement.",
+      "moduleId": "JAVA",
+      "topicId": "T-JV4",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "JV-POLY"
+      ],
+      "related": [],
+      "depth": 11
+    },
+    {
+      "id": "JV-UML",
+      "name": "UML class diagrams",
+      "description": "Association, aggregation and composition.",
+      "moduleId": "JAVA",
+      "topicId": "T-JV4",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "JV-CLASS",
+        "JV-INHER"
+      ],
+      "related": [],
+      "depth": 10
+    },
+    {
+      "id": "JV-LIST",
+      "name": "ArrayList and generics",
+      "description": "Dynamic lists and generic types.",
+      "moduleId": "JAVA",
+      "topicId": "T-JV5",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "JV-CLASS",
+        "JV-ARRAY",
+        "JV-REF"
+      ],
+      "related": [],
+      "depth": 9
+    },
+    {
+      "id": "JV-MAP",
+      "name": "HashMap and collections",
+      "description": "Key-value maps and sets.",
+      "moduleId": "JAVA",
+      "topicId": "T-JV5",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "JV-LIST"
+      ],
+      "related": [
+        "PY-DICT"
+      ],
+      "depth": 10
+    },
+    {
+      "id": "JV-EXC",
+      "name": "Exceptions",
+      "description": "try, catch, finally and throws.",
+      "moduleId": "JAVA",
+      "topicId": "T-JV5",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "JV-METH",
+        "JV-IF"
+      ],
+      "related": [],
+      "depth": 7
+    },
+    {
+      "id": "JV-FILE",
+      "name": "File input and output",
+      "description": "Reading and writing text files.",
+      "moduleId": "JAVA",
+      "topicId": "T-JV5",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "JV-EXC",
+        "JV-STR",
+        "JV-LIST"
+      ],
+      "related": [],
+      "depth": 10
+    },
+    {
+      "id": "JV-GUI",
+      "name": "Event-driven programming and GUI",
+      "description": "Swing basics and event handling.",
+      "moduleId": "JAVA",
+      "topicId": "T-JV5",
+      "level": "extension",
+      "optional": true,
+      "prerequisites": [
+        "JV-INHER",
+        "JV-IFACE"
+      ],
+      "related": [],
+      "depth": 12
+    },
+    {
+      "id": "DB-WHY",
+      "name": "Why databases",
+      "description": "Data versus information, files versus a DBMS.",
+      "moduleId": "DB",
+      "topicId": "T-DB1",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "FC-TABLES"
+      ],
+      "related": [],
+      "depth": 2
+    },
+    {
+      "id": "DB-MODEL",
+      "name": "Relational model",
+      "description": "Tables, rows, columns and relations.",
+      "moduleId": "DB",
+      "topicId": "T-DB1",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "DB-WHY"
+      ],
+      "related": [],
+      "depth": 3
+    },
+    {
+      "id": "DB-KEYS",
+      "name": "Keys",
+      "description": "Primary, candidate and foreign keys.",
+      "moduleId": "DB",
+      "topicId": "T-DB1",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "DB-MODEL"
+      ],
+      "related": [],
+      "depth": 4
+    },
+    {
+      "id": "DB-TYPES",
+      "name": "Data types and domains",
+      "description": "Attribute types and allowed values.",
+      "moduleId": "DB",
+      "topicId": "T-DB1",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "DB-MODEL",
+        "PRG-TYPE"
+      ],
+      "related": [],
+      "depth": 4
+    },
+    {
+      "id": "DB-ER",
+      "name": "Entity-relationship modelling",
+      "description": "Entities, attributes and relationships.",
+      "moduleId": "DB",
+      "topicId": "T-DB2",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "DB-KEYS"
+      ],
+      "related": [],
+      "depth": 5
+    },
+    {
+      "id": "DB-CARD",
+      "name": "Cardinality and participation",
+      "description": "One-to-one, one-to-many and many-to-many.",
+      "moduleId": "DB",
+      "topicId": "T-DB2",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "DB-ER"
+      ],
+      "related": [
+        "CM-REL"
+      ],
+      "depth": 6
+    },
+    {
+      "id": "DB-ERD",
+      "name": "ER diagram to tables",
+      "description": "Mapping entities and relationships to relational tables.",
+      "moduleId": "DB",
+      "topicId": "T-DB2",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "DB-CARD",
+        "DB-KEYS"
+      ],
+      "related": [],
+      "depth": 7
+    },
+    {
+      "id": "DB-INTEG",
+      "name": "Integrity constraints",
+      "description": "Entity and referential integrity.",
+      "moduleId": "DB",
+      "topicId": "T-DB2",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "DB-KEYS"
+      ],
+      "related": [],
+      "depth": 5
+    },
+    {
+      "id": "DB-ANOM",
+      "name": "Redundancy and anomalies",
+      "description": "Insert, update and delete anomalies.",
+      "moduleId": "DB",
+      "topicId": "T-DB3",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "DB-MODEL"
+      ],
+      "related": [],
+      "depth": 4
+    },
+    {
+      "id": "DB-FD",
+      "name": "Functional dependencies",
+      "description": "Determinants and dependencies between attributes.",
+      "moduleId": "DB",
+      "topicId": "T-DB3",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "DB-KEYS"
+      ],
+      "related": [
+        "CM-FUNCSET"
+      ],
+      "depth": 5
+    },
+    {
+      "id": "DB-1NF",
+      "name": "First normal form",
+      "description": "Atomic values and no repeating groups.",
+      "moduleId": "DB",
+      "topicId": "T-DB3",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "DB-ANOM",
+        "DB-KEYS"
+      ],
+      "related": [],
+      "depth": 5
+    },
+    {
+      "id": "DB-2NF",
+      "name": "Second normal form",
+      "description": "Removing partial dependencies.",
+      "moduleId": "DB",
+      "topicId": "T-DB3",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "DB-1NF",
+        "DB-FD"
+      ],
+      "related": [],
+      "depth": 6
+    },
+    {
+      "id": "DB-3NF",
+      "name": "Third normal form",
+      "description": "Removing transitive dependencies.",
+      "moduleId": "DB",
+      "topicId": "T-DB3",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "DB-2NF"
+      ],
+      "related": [],
+      "depth": 7
+    },
+    {
+      "id": "DB-SELECT",
+      "name": "SELECT basics",
+      "description": "SELECT, FROM and WHERE.",
+      "moduleId": "DB",
+      "topicId": "T-DB4",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "DB-TYPES",
+        "PRG-EXPR"
+      ],
+      "related": [
+        "CM-PROP"
+      ],
+      "depth": 5
+    },
+    {
+      "id": "DB-FILTER",
+      "name": "Filtering and sorting",
+      "description": "AND, OR, NOT, LIKE, IN and ORDER BY.",
+      "moduleId": "DB",
+      "topicId": "T-DB4",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "DB-SELECT"
+      ],
+      "related": [
+        "CM-PROP"
+      ],
+      "depth": 6
+    },
+    {
+      "id": "DB-AGG",
+      "name": "Aggregates and grouping",
+      "description": "COUNT, SUM, AVG, GROUP BY and HAVING.",
+      "moduleId": "DB",
+      "topicId": "T-DB4",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "DB-FILTER"
+      ],
+      "related": [
+        "CM-STAT"
+      ],
+      "depth": 7
+    },
+    {
+      "id": "DB-JOIN",
+      "name": "Joins",
+      "description": "INNER, LEFT and RIGHT joins.",
+      "moduleId": "DB",
+      "topicId": "T-DB4",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "DB-SELECT",
+        "DB-KEYS"
+      ],
+      "related": [
+        "CM-SETS"
+      ],
+      "depth": 6
+    },
+    {
+      "id": "DB-SETOPS",
+      "name": "Set operations in SQL",
+      "description": "UNION, INTERSECT and EXCEPT.",
+      "moduleId": "DB",
+      "topicId": "T-DB4",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "DB-FILTER"
+      ],
+      "related": [
+        "CM-SETS"
+      ],
+      "depth": 7
+    },
+    {
+      "id": "DB-SUBQ",
+      "name": "Subqueries",
+      "description": "Nested queries in WHERE and FROM.",
+      "moduleId": "DB",
+      "topicId": "T-DB4",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "DB-JOIN",
+        "DB-AGG"
+      ],
+      "related": [],
+      "depth": 8
+    },
+    {
+      "id": "DB-DDL",
+      "name": "Defining tables",
+      "description": "CREATE TABLE, ALTER and constraints.",
+      "moduleId": "DB",
+      "topicId": "T-DB4",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "DB-TYPES",
+        "DB-KEYS",
+        "DB-INTEG"
+      ],
+      "related": [],
+      "depth": 6
+    },
+    {
+      "id": "DB-DML",
+      "name": "Modifying data",
+      "description": "INSERT, UPDATE and DELETE.",
+      "moduleId": "DB",
+      "topicId": "T-DB4",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "DB-DDL",
+        "DB-FILTER"
+      ],
+      "related": [],
+      "depth": 7
+    },
+    {
+      "id": "DB-RELALG",
+      "name": "Relational algebra",
+      "description": "Select, project and join as set operations.",
+      "moduleId": "DB",
+      "topicId": "T-DB5",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "DB-MODEL",
+        "CM-SETS"
+      ],
+      "related": [],
+      "depth": 4
+    },
+    {
+      "id": "DB-VIEW",
+      "name": "Views and indexes",
+      "description": "Virtual tables and speeding up queries.",
+      "moduleId": "DB",
+      "topicId": "T-DB5",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "DB-JOIN",
+        "DB-DDL"
+      ],
+      "related": [],
+      "depth": 7
+    },
+    {
+      "id": "DB-TXN",
+      "name": "Transactions and ACID",
+      "description": "Commit, rollback and the ACID properties.",
+      "moduleId": "DB",
+      "topicId": "T-DB5",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "DB-DML"
+      ],
+      "related": [],
+      "depth": 8
+    },
+    {
+      "id": "DB-SEC",
+      "name": "Security and backup",
+      "description": "Users, privileges and backups.",
+      "moduleId": "DB",
+      "topicId": "T-DB5",
+      "level": "core",
+      "optional": false,
+      "prerequisites": [
+        "DB-DDL"
+      ],
+      "related": [],
+      "depth": 7
+    },
+    {
+      "id": "DB-APP",
+      "name": "Connecting applications",
+      "description": "Using a database from Python or Java.",
+      "moduleId": "DB",
+      "topicId": "T-DB5",
+      "level": "extension",
+      "optional": true,
+      "prerequisites": [
+        "DB-DML",
+        "PRG-FUNC"
+      ],
+      "related": [
+        "PY-FUNC",
+        "JV-METH"
+      ],
+      "depth": 8
+    }
+  ],
+  "edges": [
+    {
+      "concept": "FM-ALG",
+      "prerequisite": "FM-ARITH",
+      "type": "hard"
+    },
+    {
+      "concept": "FM-EXP",
+      "prerequisite": "FM-ALG",
+      "type": "hard"
+    },
+    {
+      "concept": "FM-LINE",
+      "prerequisite": "FM-ALG",
+      "type": "hard"
+    },
+    {
+      "concept": "FM-QUAD",
+      "prerequisite": "FM-ALG",
+      "type": "hard"
+    },
+    {
+      "concept": "FM-FUNC",
+      "prerequisite": "FM-ALG",
+      "type": "hard"
+    },
+    {
+      "concept": "FM-FUNC",
+      "prerequisite": "FM-LINE",
+      "type": "hard"
+    },
+    {
+      "concept": "FM-TRIG",
+      "prerequisite": "FM-FUNC",
+      "type": "hard"
+    },
+    {
+      "concept": "FC-BITS",
+      "prerequisite": "FC-LIT",
+      "type": "hard"
+    },
+    {
+      "concept": "FC-TABLES",
+      "prerequisite": "FC-LIT",
+      "type": "hard"
+    },
+    {
+      "concept": "PRG-ALGO",
+      "prerequisite": "FM-LOGIC",
+      "type": "hard"
+    },
+    {
+      "concept": "PRG-VAR",
+      "prerequisite": "FC-LIT",
+      "type": "hard"
+    },
+    {
+      "concept": "PRG-VAR",
+      "prerequisite": "FM-ALG",
+      "type": "soft"
+    },
+    {
+      "concept": "PRG-TYPE",
+      "prerequisite": "PRG-VAR",
+      "type": "hard"
+    },
+    {
+      "concept": "PRG-EXPR",
+      "prerequisite": "PRG-TYPE",
+      "type": "hard"
+    },
+    {
+      "concept": "PRG-EXPR",
+      "prerequisite": "FM-ARITH",
+      "type": "hard"
+    },
+    {
+      "concept": "PRG-EXPR",
+      "prerequisite": "FM-LOGIC",
+      "type": "hard"
+    },
+    {
+      "concept": "PRG-COND",
+      "prerequisite": "PRG-EXPR",
+      "type": "hard"
+    },
+    {
+      "concept": "PRG-LOOP",
+      "prerequisite": "PRG-COND",
+      "type": "hard"
+    },
+    {
+      "concept": "PRG-FUNC",
+      "prerequisite": "PRG-VAR",
+      "type": "hard"
+    },
+    {
+      "concept": "PRG-FUNC",
+      "prerequisite": "PRG-COND",
+      "type": "hard"
+    },
+    {
+      "concept": "PRG-COLL",
+      "prerequisite": "PRG-TYPE",
+      "type": "hard"
+    },
+    {
+      "concept": "PRG-COLL",
+      "prerequisite": "PRG-LOOP",
+      "type": "hard"
+    },
+    {
+      "concept": "PRG-TRACE",
+      "prerequisite": "PRG-VAR",
+      "type": "hard"
+    },
+    {
+      "concept": "PRG-TRACE",
+      "prerequisite": "PRG-COND",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-NUMSYS",
+      "prerequisite": "FM-ARITH",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-NUMSYS",
+      "prerequisite": "FM-EXP",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-NUMSYS",
+      "prerequisite": "FC-BITS",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-CONV",
+      "prerequisite": "CM-NUMSYS",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-BINARITH",
+      "prerequisite": "CM-CONV",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-FLOAT",
+      "prerequisite": "CM-BINARITH",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-PROP",
+      "prerequisite": "FM-LOGIC",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-EQUIV",
+      "prerequisite": "CM-PROP",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-BOOL",
+      "prerequisite": "CM-EQUIV",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-PRED",
+      "prerequisite": "CM-PROP",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-PRED",
+      "prerequisite": "CM-SETS",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-PROOF",
+      "prerequisite": "CM-EQUIV",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-SETS",
+      "prerequisite": "FM-LOGIC",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-REL",
+      "prerequisite": "CM-SETS",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-FUNCSET",
+      "prerequisite": "CM-SETS",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-FUNCSET",
+      "prerequisite": "FM-FUNC",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-COMP",
+      "prerequisite": "CM-FUNCSET",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-SEQ",
+      "prerequisite": "FM-ALG",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-SEQ",
+      "prerequisite": "FM-EXP",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-SIGMA",
+      "prerequisite": "CM-SEQ",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-RECUR",
+      "prerequisite": "CM-SEQ",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-INDUCT",
+      "prerequisite": "CM-SIGMA",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-INDUCT",
+      "prerequisite": "CM-PROP",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-INDUCT",
+      "prerequisite": "CM-RECUR",
+      "type": "soft"
+    },
+    {
+      "concept": "CM-COUNT",
+      "prerequisite": "FM-ARITH",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-COUNT",
+      "prerequisite": "CM-SETS",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-PROB",
+      "prerequisite": "CM-COUNT",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-PROB",
+      "prerequisite": "CM-SETS",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-COND",
+      "prerequisite": "CM-PROB",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-BAYES",
+      "prerequisite": "CM-COND",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-STAT",
+      "prerequisite": "FM-ALG",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-RV",
+      "prerequisite": "CM-PROB",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-RV",
+      "prerequisite": "CM-STAT",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-DIST",
+      "prerequisite": "CM-RV",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-VEC",
+      "prerequisite": "FM-ALG",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-VEC",
+      "prerequisite": "FM-TRIG",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-MAT",
+      "prerequisite": "FM-ALG",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-MATMUL",
+      "prerequisite": "CM-MAT",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-MATMUL",
+      "prerequisite": "CM-VEC",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-DET",
+      "prerequisite": "CM-MATMUL",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-LINSYS",
+      "prerequisite": "FM-LINE",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-LINSYS",
+      "prerequisite": "CM-MAT",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-LIM",
+      "prerequisite": "FM-FUNC",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-DER",
+      "prerequisite": "CM-LIM",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-DERRULES",
+      "prerequisite": "CM-DER",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-CHAIN",
+      "prerequisite": "CM-DER",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-CHAIN",
+      "prerequisite": "CM-COMP",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-OPT",
+      "prerequisite": "CM-DER",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-OPT",
+      "prerequisite": "FM-QUAD",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-INTEG",
+      "prerequisite": "CM-DER",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-PARTIAL",
+      "prerequisite": "CM-CHAIN",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-PARTIAL",
+      "prerequisite": "CM-VEC",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-GRADDESC",
+      "prerequisite": "CM-PARTIAL",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-GRADDESC",
+      "prerequisite": "CM-OPT",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-GRAPH",
+      "prerequisite": "CM-SETS",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-GRAPH",
+      "prerequisite": "CM-REL",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-TREE",
+      "prerequisite": "CM-GRAPH",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-BIGO",
+      "prerequisite": "FM-FUNC",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-BIGO",
+      "prerequisite": "FM-EXP",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-ROOT",
+      "prerequisite": "CM-DER",
+      "type": "hard"
+    },
+    {
+      "concept": "CM-ROOT",
+      "prerequisite": "CM-FLOAT",
+      "type": "hard"
+    },
+    {
+      "concept": "PY-ENV",
+      "prerequisite": "FC-LIT",
+      "type": "hard"
+    },
+    {
+      "concept": "PY-SYNTAX",
+      "prerequisite": "PY-ENV",
+      "type": "hard"
+    },
+    {
+      "concept": "PY-VAR",
+      "prerequisite": "PRG-VAR",
+      "type": "hard"
+    },
+    {
+      "concept": "PY-VAR",
+      "prerequisite": "PY-SYNTAX",
+      "type": "hard"
+    },
+    {
+      "concept": "PY-TYPES",
+      "prerequisite": "PY-VAR",
+      "type": "hard"
+    },
+    {
+      "concept": "PY-TYPES",
+      "prerequisite": "PRG-TYPE",
+      "type": "hard"
+    },
+    {
+      "concept": "PY-IO",
+      "prerequisite": "PY-TYPES",
+      "type": "hard"
+    },
+    {
+      "concept": "PY-OPS",
+      "prerequisite": "PY-TYPES",
+      "type": "hard"
+    },
+    {
+      "concept": "PY-OPS",
+      "prerequisite": "PRG-EXPR",
+      "type": "hard"
+    },
+    {
+      "concept": "PY-IF",
+      "prerequisite": "PY-OPS",
+      "type": "hard"
+    },
+    {
+      "concept": "PY-IF",
+      "prerequisite": "PRG-COND",
+      "type": "hard"
+    },
+    {
+      "concept": "PY-WHILE",
+      "prerequisite": "PY-IF",
+      "type": "hard"
+    },
+    {
+      "concept": "PY-WHILE",
+      "prerequisite": "PRG-LOOP",
+      "type": "hard"
+    },
+    {
+      "concept": "PY-FOR",
+      "prerequisite": "PY-IF",
+      "type": "hard"
+    },
+    {
+      "concept": "PY-FOR",
+      "prerequisite": "PRG-LOOP",
+      "type": "hard"
+    },
+    {
+      "concept": "PY-NEST",
+      "prerequisite": "PY-WHILE",
+      "type": "hard"
+    },
+    {
+      "concept": "PY-NEST",
+      "prerequisite": "PY-FOR",
+      "type": "hard"
+    },
+    {
+      "concept": "PY-STR",
+      "prerequisite": "PY-TYPES",
+      "type": "hard"
+    },
+    {
+      "concept": "PY-STR",
+      "prerequisite": "PY-FOR",
+      "type": "hard"
+    },
+    {
+      "concept": "PY-LIST",
+      "prerequisite": "PY-FOR",
+      "type": "hard"
+    },
+    {
+      "concept": "PY-LIST",
+      "prerequisite": "PRG-COLL",
+      "type": "hard"
+    },
+    {
+      "concept": "PY-TUPLE",
+      "prerequisite": "PY-LIST",
+      "type": "hard"
+    },
+    {
+      "concept": "PY-DICT",
+      "prerequisite": "PY-LIST",
+      "type": "hard"
+    },
+    {
+      "concept": "PY-SET",
+      "prerequisite": "PY-LIST",
+      "type": "hard"
+    },
+    {
+      "concept": "PY-SET",
+      "prerequisite": "CM-SETS",
+      "type": "soft"
+    },
+    {
+      "concept": "PY-COMP",
+      "prerequisite": "PY-LIST",
+      "type": "hard"
+    },
+    {
+      "concept": "PY-COMP",
+      "prerequisite": "PY-FOR",
+      "type": "hard"
+    },
+    {
+      "concept": "PY-FUNC",
+      "prerequisite": "PY-IF",
+      "type": "hard"
+    },
+    {
+      "concept": "PY-FUNC",
+      "prerequisite": "PRG-FUNC",
+      "type": "hard"
+    },
+    {
+      "concept": "PY-PARAM",
+      "prerequisite": "PY-FUNC",
+      "type": "hard"
+    },
+    {
+      "concept": "PY-SCOPE",
+      "prerequisite": "PY-FUNC",
+      "type": "hard"
+    },
+    {
+      "concept": "PY-RECUR",
+      "prerequisite": "PY-PARAM",
+      "type": "hard"
+    },
+    {
+      "concept": "PY-RECUR",
+      "prerequisite": "PY-IF",
+      "type": "hard"
+    },
+    {
+      "concept": "PY-RECUR",
+      "prerequisite": "CM-RECUR",
+      "type": "soft"
+    },
+    {
+      "concept": "PY-RECUR",
+      "prerequisite": "CM-INDUCT",
+      "type": "soft"
+    },
+    {
+      "concept": "PY-MOD",
+      "prerequisite": "PY-FUNC",
+      "type": "hard"
+    },
+    {
+      "concept": "PY-FILE",
+      "prerequisite": "PY-IO",
+      "type": "hard"
+    },
+    {
+      "concept": "PY-FILE",
+      "prerequisite": "PY-FOR",
+      "type": "hard"
+    },
+    {
+      "concept": "PY-FILE",
+      "prerequisite": "PY-STR",
+      "type": "hard"
+    },
+    {
+      "concept": "PY-EXC",
+      "prerequisite": "PY-IF",
+      "type": "hard"
+    },
+    {
+      "concept": "PY-EXC",
+      "prerequisite": "PY-FUNC",
+      "type": "hard"
+    },
+    {
+      "concept": "PY-DEBUG",
+      "prerequisite": "PY-FUNC",
+      "type": "hard"
+    },
+    {
+      "concept": "PY-DEBUG",
+      "prerequisite": "PRG-TRACE",
+      "type": "hard"
+    },
+    {
+      "concept": "PY-SORT",
+      "prerequisite": "PY-LIST",
+      "type": "hard"
+    },
+    {
+      "concept": "PY-SORT",
+      "prerequisite": "PY-NEST",
+      "type": "hard"
+    },
+    {
+      "concept": "PY-SORT",
+      "prerequisite": "CM-BIGO",
+      "type": "soft"
+    },
+    {
+      "concept": "PY-DECOMP",
+      "prerequisite": "PY-PARAM",
+      "type": "hard"
+    },
+    {
+      "concept": "PY-DECOMP",
+      "prerequisite": "PY-FILE",
+      "type": "hard"
+    },
+    {
+      "concept": "PY-DECOMP",
+      "prerequisite": "PRG-ALGO",
+      "type": "hard"
+    },
+    {
+      "concept": "JV-ENV",
+      "prerequisite": "FC-LIT",
+      "type": "hard"
+    },
+    {
+      "concept": "JV-SYNTAX",
+      "prerequisite": "JV-ENV",
+      "type": "hard"
+    },
+    {
+      "concept": "JV-VAR",
+      "prerequisite": "JV-SYNTAX",
+      "type": "hard"
+    },
+    {
+      "concept": "JV-VAR",
+      "prerequisite": "PRG-VAR",
+      "type": "hard"
+    },
+    {
+      "concept": "JV-VAR",
+      "prerequisite": "PRG-TYPE",
+      "type": "hard"
+    },
+    {
+      "concept": "JV-OPS",
+      "prerequisite": "JV-VAR",
+      "type": "hard"
+    },
+    {
+      "concept": "JV-OPS",
+      "prerequisite": "PRG-EXPR",
+      "type": "hard"
+    },
+    {
+      "concept": "JV-IO",
+      "prerequisite": "JV-VAR",
+      "type": "hard"
+    },
+    {
+      "concept": "JV-IF",
+      "prerequisite": "JV-OPS",
+      "type": "hard"
+    },
+    {
+      "concept": "JV-IF",
+      "prerequisite": "PRG-COND",
+      "type": "hard"
+    },
+    {
+      "concept": "JV-LOOP",
+      "prerequisite": "JV-IF",
+      "type": "hard"
+    },
+    {
+      "concept": "JV-LOOP",
+      "prerequisite": "PRG-LOOP",
+      "type": "hard"
+    },
+    {
+      "concept": "JV-ARRAY",
+      "prerequisite": "JV-LOOP",
+      "type": "hard"
+    },
+    {
+      "concept": "JV-ARRAY",
+      "prerequisite": "PRG-COLL",
+      "type": "hard"
+    },
+    {
+      "concept": "JV-STR",
+      "prerequisite": "JV-OPS",
+      "type": "hard"
+    },
+    {
+      "concept": "JV-STR",
+      "prerequisite": "JV-LOOP",
+      "type": "hard"
+    },
+    {
+      "concept": "JV-METH",
+      "prerequisite": "JV-IF",
+      "type": "hard"
+    },
+    {
+      "concept": "JV-METH",
+      "prerequisite": "PRG-FUNC",
+      "type": "hard"
+    },
+    {
+      "concept": "JV-CLASS",
+      "prerequisite": "JV-METH",
+      "type": "hard"
+    },
+    {
+      "concept": "JV-CLASS",
+      "prerequisite": "JV-VAR",
+      "type": "hard"
+    },
+    {
+      "concept": "JV-ENCAP",
+      "prerequisite": "JV-CLASS",
+      "type": "hard"
+    },
+    {
+      "concept": "JV-STATIC",
+      "prerequisite": "JV-CLASS",
+      "type": "hard"
+    },
+    {
+      "concept": "JV-REF",
+      "prerequisite": "JV-CLASS",
+      "type": "hard"
+    },
+    {
+      "concept": "JV-REF",
+      "prerequisite": "JV-ARRAY",
+      "type": "hard"
+    },
+    {
+      "concept": "JV-TOSTR",
+      "prerequisite": "JV-REF",
+      "type": "hard"
+    },
+    {
+      "concept": "JV-TOSTR",
+      "prerequisite": "JV-STR",
+      "type": "hard"
+    },
+    {
+      "concept": "JV-INHER",
+      "prerequisite": "JV-ENCAP",
+      "type": "hard"
+    },
+    {
+      "concept": "JV-POLY",
+      "prerequisite": "JV-INHER",
+      "type": "hard"
+    },
+    {
+      "concept": "JV-POLY",
+      "prerequisite": "JV-REF",
+      "type": "hard"
+    },
+    {
+      "concept": "JV-ABS",
+      "prerequisite": "JV-INHER",
+      "type": "hard"
+    },
+    {
+      "concept": "JV-IFACE",
+      "prerequisite": "JV-POLY",
+      "type": "hard"
+    },
+    {
+      "concept": "JV-UML",
+      "prerequisite": "JV-CLASS",
+      "type": "hard"
+    },
+    {
+      "concept": "JV-UML",
+      "prerequisite": "JV-INHER",
+      "type": "hard"
+    },
+    {
+      "concept": "JV-LIST",
+      "prerequisite": "JV-CLASS",
+      "type": "hard"
+    },
+    {
+      "concept": "JV-LIST",
+      "prerequisite": "JV-ARRAY",
+      "type": "hard"
+    },
+    {
+      "concept": "JV-LIST",
+      "prerequisite": "JV-REF",
+      "type": "hard"
+    },
+    {
+      "concept": "JV-MAP",
+      "prerequisite": "JV-LIST",
+      "type": "hard"
+    },
+    {
+      "concept": "JV-MAP",
+      "prerequisite": "PY-DICT",
+      "type": "soft"
+    },
+    {
+      "concept": "JV-EXC",
+      "prerequisite": "JV-METH",
+      "type": "hard"
+    },
+    {
+      "concept": "JV-EXC",
+      "prerequisite": "JV-IF",
+      "type": "hard"
+    },
+    {
+      "concept": "JV-FILE",
+      "prerequisite": "JV-EXC",
+      "type": "hard"
+    },
+    {
+      "concept": "JV-FILE",
+      "prerequisite": "JV-STR",
+      "type": "hard"
+    },
+    {
+      "concept": "JV-FILE",
+      "prerequisite": "JV-LIST",
+      "type": "hard"
+    },
+    {
+      "concept": "JV-GUI",
+      "prerequisite": "JV-INHER",
+      "type": "hard"
+    },
+    {
+      "concept": "JV-GUI",
+      "prerequisite": "JV-IFACE",
+      "type": "hard"
+    },
+    {
+      "concept": "DB-WHY",
+      "prerequisite": "FC-TABLES",
+      "type": "hard"
+    },
+    {
+      "concept": "DB-MODEL",
+      "prerequisite": "DB-WHY",
+      "type": "hard"
+    },
+    {
+      "concept": "DB-KEYS",
+      "prerequisite": "DB-MODEL",
+      "type": "hard"
+    },
+    {
+      "concept": "DB-TYPES",
+      "prerequisite": "DB-MODEL",
+      "type": "hard"
+    },
+    {
+      "concept": "DB-TYPES",
+      "prerequisite": "PRG-TYPE",
+      "type": "hard"
+    },
+    {
+      "concept": "DB-ER",
+      "prerequisite": "DB-KEYS",
+      "type": "hard"
+    },
+    {
+      "concept": "DB-CARD",
+      "prerequisite": "DB-ER",
+      "type": "hard"
+    },
+    {
+      "concept": "DB-CARD",
+      "prerequisite": "CM-REL",
+      "type": "soft"
+    },
+    {
+      "concept": "DB-ERD",
+      "prerequisite": "DB-CARD",
+      "type": "hard"
+    },
+    {
+      "concept": "DB-ERD",
+      "prerequisite": "DB-KEYS",
+      "type": "hard"
+    },
+    {
+      "concept": "DB-INTEG",
+      "prerequisite": "DB-KEYS",
+      "type": "hard"
+    },
+    {
+      "concept": "DB-ANOM",
+      "prerequisite": "DB-MODEL",
+      "type": "hard"
+    },
+    {
+      "concept": "DB-FD",
+      "prerequisite": "DB-KEYS",
+      "type": "hard"
+    },
+    {
+      "concept": "DB-FD",
+      "prerequisite": "CM-FUNCSET",
+      "type": "soft"
+    },
+    {
+      "concept": "DB-1NF",
+      "prerequisite": "DB-ANOM",
+      "type": "hard"
+    },
+    {
+      "concept": "DB-1NF",
+      "prerequisite": "DB-KEYS",
+      "type": "hard"
+    },
+    {
+      "concept": "DB-2NF",
+      "prerequisite": "DB-1NF",
+      "type": "hard"
+    },
+    {
+      "concept": "DB-2NF",
+      "prerequisite": "DB-FD",
+      "type": "hard"
+    },
+    {
+      "concept": "DB-3NF",
+      "prerequisite": "DB-2NF",
+      "type": "hard"
+    },
+    {
+      "concept": "DB-SELECT",
+      "prerequisite": "DB-TYPES",
+      "type": "hard"
+    },
+    {
+      "concept": "DB-SELECT",
+      "prerequisite": "PRG-EXPR",
+      "type": "hard"
+    },
+    {
+      "concept": "DB-SELECT",
+      "prerequisite": "CM-PROP",
+      "type": "soft"
+    },
+    {
+      "concept": "DB-FILTER",
+      "prerequisite": "DB-SELECT",
+      "type": "hard"
+    },
+    {
+      "concept": "DB-FILTER",
+      "prerequisite": "CM-PROP",
+      "type": "soft"
+    },
+    {
+      "concept": "DB-AGG",
+      "prerequisite": "DB-FILTER",
+      "type": "hard"
+    },
+    {
+      "concept": "DB-AGG",
+      "prerequisite": "CM-STAT",
+      "type": "soft"
+    },
+    {
+      "concept": "DB-JOIN",
+      "prerequisite": "DB-SELECT",
+      "type": "hard"
+    },
+    {
+      "concept": "DB-JOIN",
+      "prerequisite": "DB-KEYS",
+      "type": "hard"
+    },
+    {
+      "concept": "DB-JOIN",
+      "prerequisite": "CM-SETS",
+      "type": "soft"
+    },
+    {
+      "concept": "DB-SETOPS",
+      "prerequisite": "DB-FILTER",
+      "type": "hard"
+    },
+    {
+      "concept": "DB-SETOPS",
+      "prerequisite": "CM-SETS",
+      "type": "soft"
+    },
+    {
+      "concept": "DB-SUBQ",
+      "prerequisite": "DB-JOIN",
+      "type": "hard"
+    },
+    {
+      "concept": "DB-SUBQ",
+      "prerequisite": "DB-AGG",
+      "type": "hard"
+    },
+    {
+      "concept": "DB-DDL",
+      "prerequisite": "DB-TYPES",
+      "type": "hard"
+    },
+    {
+      "concept": "DB-DDL",
+      "prerequisite": "DB-KEYS",
+      "type": "hard"
+    },
+    {
+      "concept": "DB-DDL",
+      "prerequisite": "DB-INTEG",
+      "type": "hard"
+    },
+    {
+      "concept": "DB-DML",
+      "prerequisite": "DB-DDL",
+      "type": "hard"
+    },
+    {
+      "concept": "DB-DML",
+      "prerequisite": "DB-FILTER",
+      "type": "hard"
+    },
+    {
+      "concept": "DB-RELALG",
+      "prerequisite": "DB-MODEL",
+      "type": "hard"
+    },
+    {
+      "concept": "DB-RELALG",
+      "prerequisite": "CM-SETS",
+      "type": "hard"
+    },
+    {
+      "concept": "DB-VIEW",
+      "prerequisite": "DB-JOIN",
+      "type": "hard"
+    },
+    {
+      "concept": "DB-VIEW",
+      "prerequisite": "DB-DDL",
+      "type": "hard"
+    },
+    {
+      "concept": "DB-TXN",
+      "prerequisite": "DB-DML",
+      "type": "hard"
+    },
+    {
+      "concept": "DB-SEC",
+      "prerequisite": "DB-DDL",
+      "type": "hard"
+    },
+    {
+      "concept": "DB-APP",
+      "prerequisite": "DB-DML",
+      "type": "hard"
+    },
+    {
+      "concept": "DB-APP",
+      "prerequisite": "PRG-FUNC",
+      "type": "hard"
+    },
+    {
+      "concept": "DB-APP",
+      "prerequisite": "PY-FUNC",
+      "type": "soft"
+    },
+    {
+      "concept": "DB-APP",
+      "prerequisite": "JV-METH",
+      "type": "soft"
+    }
+  ]
+}

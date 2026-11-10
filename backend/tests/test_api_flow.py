@@ -1,8 +1,10 @@
+import base64
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
-from store.seed import DEMO_LECTURER_EMAIL, DEMO_PASSWORD, DEMO_STUDENT_EMAIL
+import config
+from store.seed import DEMO_PASSWORD, DEMO_STUDENT_EMAIL
 from store.local_store import LocalStore
 
 from conftest import answer_as
@@ -12,10 +14,17 @@ def auth(token):
     return {"Authorization": f"Bearer {token}"}
 
 
-def signup(client, email="new.student@example.edu", **extra):
-    body = {"name": "New Student", "email": email, "password": "correct-horse-1",
-            "confirmPassword": "correct-horse-1", "university": "Example University",
-            "studentId": email.split("@")[0], "programme": "BSc Computer Science", **extra}
+def signup(client, email="new.student@gmail.com", **extra):
+    body = {
+        "name": "New Student",
+        "email": email,
+        "password": "correct-horse-1",
+        "confirmPassword": "correct-horse-1",
+        "university": "Example University",
+        "studentId": email.split("@")[0].replace(".", ""),
+        "programme": "BSc Computer Science",
+        **extra,
+    }
     return client.post("/api/auth/signup", json=body)
 
 
@@ -26,7 +35,7 @@ def test_student_signup_login_and_me(client):
     assert r.json()["user"]["role"] == "student"
     assert "passwordHash" not in r.json()["user"]
     assert "confirmPassword" not in r.json()["user"]
-    r = client.post("/api/auth/login", json={"email": "NEW.student@example.edu", "password": "correct-horse-1"})
+    r = client.post("/api/auth/login", json={"email": "NEW.student@gmail.com", "password": "correct-horse-1"})
     assert r.status_code == 200
     me = client.get("/api/me", headers=auth(r.json()["token"]))
     assert me.json()["name"] == "New Student" and me.json()["year"] == 2
@@ -35,9 +44,17 @@ def test_student_signup_login_and_me(client):
     assert me.json()["programme"] == "BSc CS"
     passport = client.get("/api/me/passport", headers=auth(r.json()["token"])).json()
     assert passport["studentId"] == "TP12345" and passport["university"] == "Example University"
+    assert passport["holderNo"] == "TP12345"
+    assert len(passport["regions"]) == 6
     stored = LocalStore(client.svc.store.path).get("users", me.json()["uid"])
     assert stored["studentId"] == "TP12345"
     assert not {"password", "confirmPassword"} & stored.keys()
+
+
+def test_signup_requires_personal_gmail_address(client):
+    r = signup(client, email="student@university.edu", studentId="TP99999")
+    assert r.status_code == 400
+    assert "gmail.com" in r.json()["error"].lower()
 
 
 @pytest.mark.parametrize("field,value", [
@@ -55,38 +72,37 @@ def test_signup_requires_valid_student_details(client, field, value):
 
 def test_student_id_uniqueness_is_case_insensitive(client):
     assert signup(client, studentId="TP001").status_code == 200
-    duplicate = signup(client, email="another@example.edu", studentId=" tp001 ")
+    duplicate = signup(client, email="another@gmail.com", studentId=" tp001 ")
     assert duplicate.status_code == 409
     assert "student ID" in duplicate.json()["error"]
-    # Both identifiers must be unique; a different ID does not bypass the email check.
     assert signup(client, studentId="TP002").status_code == 409
 
 
 def test_simultaneous_signups_cannot_reuse_a_student_id(client):
     def create(index):
-        return signup(client, email=f"parallel{index}@example.edu", studentId="TP-CONCURRENT").status_code
+        return signup(client, email=f"parallel{index}@gmail.com", studentId="TP-CONCURRENT").status_code
     with ThreadPoolExecutor(max_workers=2) as pool:
         statuses = list(pool.map(create, [1, 2]))
     assert sorted(statuses) == [200, 409]
     assert len(client.svc.store.list("users", lambda u: u.get("studentId") == "TP-CONCURRENT")) == 1
 
 
-def test_signup_cannot_create_a_lecturer(client):
-    r = signup(client, role="lecturer")
-    assert r.status_code == 200
-    assert r.json()["user"]["role"] == "student"
+def test_lecturer_and_moodle_routes_are_removed(client):
+    tok = signup(client).json()["token"]
+    assert client.get("/api/lecturer/overview", headers=auth(tok)).status_code == 404
+    assert client.get("/api/moodle/status", headers=auth(tok)).status_code == 404
 
 
 def test_signup_validation(client):
     assert signup(client, email="not-an-email").status_code == 400
-    assert client.post("/api/auth/signup", json={"name": "X Y", "email": "a@b.co", "password": "short"}).status_code == 400
+    assert client.post("/api/auth/signup", json={"name": "X Y", "email": "a@gmail.com", "password": "short"}).status_code == 400
     assert signup(client).status_code == 200
     assert signup(client).status_code == 409  # duplicate email
 
 
 def test_wrong_password_and_missing_token(client):
     signup(client)
-    assert client.post("/api/auth/login", json={"email": "new.student@example.edu", "password": "nope-nope"}).status_code == 401
+    assert client.post("/api/auth/login", json={"email": "new.student@gmail.com", "password": "nope-nope"}).status_code == 401
     assert client.get("/api/me").status_code == 401
 
 
@@ -96,149 +112,155 @@ def test_logout_revokes_token(client):
     assert client.get("/api/me", headers=auth(tok)).status_code == 401
 
 
-def test_student_cannot_open_lecturer_dashboard(client):
-    tok = signup(client).json()["token"]
-    assert client.get("/api/lecturer/overview", headers=auth(tok)).status_code == 403
+def test_demo_accounts_and_passport_reentry_states(client):
+    res = client.get("/api/demo/accounts")
+    assert res.status_code == 200
+    accounts = res.json()["accounts"]
+    assert len(accounts) == 5
+
+    login_res = client.post("/api/auth/login", json={"email": "aisyah.student@demo.punca.edu", "password": DEMO_PASSWORD})
+    assert login_res.status_code == 200
+    tok = login_res.json()["token"]
+    pp = client.get("/api/me/passport", headers=auth(tok)).json()
+    assert pp["holderNo"] == "TP071204"
+    assert pp["stampSummary"]["completed"] == 5
+    assert pp["stampSummary"]["reentry"] == 1
+    diff_c = next(c for r in pp["regions"] for c in r["concepts"] if c["conceptId"] == "CM-DERRULES")
+    assert diff_c["state"] == "reentry"
 
 
-# ---- full demo flow ----------------------------------------------------------------------------
-def test_demo_flow_diagnose_stamp_circle_endorse(client, catalog):
+# ---- full student flow (document foundation assessment, 5-10 probes, stamp, peer circle, Google Workspace) ----
+def test_demo_flow_diagnose_with_file_stamp_and_peer_circle(client, catalog):
     stu = client.post("/api/auth/login", json={"email": DEMO_STUDENT_EMAIL, "password": DEMO_PASSWORD}).json()["token"]
     h = auth(stu)
 
-    m = client.post("/api/map", json={"stuckInput": "I don't get how backprop computes gradients for hidden layer weights"}, headers=h).json()
-    assert m["targetConceptId"] == "backpropagation"
+    # Map stuck point with an uploaded document from PC and save to Google Drive
+    doc_bytes = b"Lab 7 Calculus: Implement gradient descent by computing partial derivatives and applying the chain rule."
+    m = client.post(
+        "/api/map",
+        json={
+            "stuckInput": "Minimising a function with gradient descent and partial derivatives",
+            "fileName": "Calculus_Gradient_Lab.txt",
+            "fileBase64": base64.b64encode(doc_bytes).decode("ascii"),
+            "saveToDrive": True,
+        },
+        headers=h,
+    ).json()
+    assert m["targetConceptId"] == "CM-GRADDESC"
+    assert m["documentSummary"]["fileName"] == "Calculus_Gradient_Lab.txt"
+    assert len(m["requiredFoundations"]) >= 3
 
-    d = client.post("/api/diagnoses", json={"stuckInput": "backprop", "targetConceptId": m["targetConceptId"], "mapping": m}, headers=h).json()
+    d = client.post(
+        "/api/diagnoses",
+        json={"stuckInput": "gradient descent", "targetConceptId": m["targetConceptId"], "mapping": m},
+        headers=h,
+    ).json()
     while d["status"] == "in_progress":
         p = d["pending"]
-        r = client.post(f"/api/diagnoses/{d['id']}/answer", json={"probeId": p["probeId"], "choiceIndex": answer_as("chain-rule", catalog, p)}, headers=h)
+        r = client.post(
+            f"/api/diagnoses/{d['id']}/answer",
+            json={
+                "probeId": p["probeId"],
+                "choiceIndex": answer_as("CM-CHAIN", catalog, p),
+                "confidence": "high",
+            },
+            headers=h,
+        )
         assert r.status_code == 200, r.text
         d = r.json()["diagnosis"]
-    assert d["result"]["rootCauseConceptId"] == "chain-rule"
-    assert 3 <= d["probesAsked"] <= 5
+    assert d["result"]["rootCauseConceptId"] == "CM-CHAIN"
+    assert config.MIN_PROBES <= d["probesAsked"] <= config.MAX_PROBES
+    assert d["result"]["confidenceAssessment"]["total"] == d["probesAsked"]
 
     rem = client.get(f"/api/diagnoses/{d['id']}/remediation", headers=h).json()
-    assert rem["found"] and rem["citations"][0]["sourceId"] == "calculus.md#chain-rule"
+    assert rem["found"] and rem["citations"][0]["sourceId"] == "cm.md#CM-CHAIN"
     assert len(rem["practice"]) == 3
+
+    # Export remediation to Google Docs & Google Tasks
+    gdoc = client.post(f"/api/google/docs/from-diagnosis/{d['id']}", headers=h)
+    assert gdoc.status_code == 200 and "CM-CHAIN" in gdoc.json()["doc"]["content"]
+    gtasks = client.post(f"/api/google/tasks/from-diagnosis/{d['id']}", headers=h)
+    assert gtasks.status_code == 200 and len(gtasks.json()["created"]) >= 2
 
     # Passport: the diagnosis alone never stamps; the gap shows as entry required.
     pp = client.get("/api/me/passport", headers=h).json()
-    chain = next(c for r in pp["regions"] for c in r["concepts"] if c["conceptId"] == "chain-rule")
+    chain = next(c for r in pp["regions"] for c in r["concepts"] if c["conceptId"] == "CM-CHAIN")
     assert chain["state"] == "entry-required" and pp["stamps"] == 0
-    assert pp["next"]["targetConceptId"] == "backpropagation"
+    assert pp["holderNo"] == pp["studentId"]
+    assert pp["next"]["targetConceptId"] == "CM-GRADDESC"
 
-    # Two passed re-checks: amber, then solid with a verified stamp.
+    # Two passed re-checks: amber, then solid with a completed stamp.
     states = []
     for _ in range(2):
-        q = client.post("/api/recheck", json={"conceptId": "chain-rule"}, headers=h).json()
-        a = client.post("/api/recheck/answer", json={"probeId": q["probeId"], "choiceIndex": catalog.probes[q["probeId"]]["correctIndex"]}, headers=h).json()
+        q = client.post("/api/recheck", json={"conceptId": "CM-CHAIN"}, headers=h).json()
+        a = client.post(
+            "/api/recheck/answer",
+            json={"probeId": q["probeId"], "choiceIndex": catalog.probes[q["probeId"]]["correctIndex"]},
+            headers=h,
+        ).json()
         states.append((a["status"], a["stampEarned"]))
     assert states == [("shaky", False), ("solid", True)]
+    pp_after = client.get("/api/me/passport", headers=h).json()
+    assert pp_after["stampSummary"]["completed"] == 1
 
-    # Study circle with a lecturer slot.
+    # Peer study circle with Google Meet, Google Chat, and Google Calendar
     sug = client.get("/api/circles/suggestion", headers=h).json()
-    assert sug["status"] == "proposal" and sug["circle"]["mode"] == "lecturer"
-    circle = client.post("/api/circles/join", json={"conceptId": "chain-rule"}, headers=h).json()
+    assert sug["status"] == "proposal" and sug["circle"]["mode"] == "peer"
+    circle = client.post("/api/circles/join", json={"conceptId": "CM-CHAIN"}, headers=h).json()
     assert circle["isMember"] and 3 <= circle["memberCount"] <= 6
+    assert circle["meetNewUrl"] == "https://meet.google.com/new"
 
-    # Demo staff login confirms the circle and countersigns the stamp.
-    lec = client.post("/api/auth/login", json={"email": DEMO_LECTURER_EMAIL, "password": DEMO_PASSWORD}).json()["token"]
-    ov = client.get("/api/lecturer/overview", headers=auth(lec)).json()
-    assert any(c["id"] == circle["id"] for c in ov["requests"])
-    assert all(row["students"] >= ov["minCount"] for row in ov["demand"])
-    assert client.post(f"/api/lecturer/circles/{circle['id']}/endorse", headers=auth(lec)).status_code == 409
-    client.post(f"/api/lecturer/circles/{circle['id']}/confirm", headers=auth(lec))
-    e = client.post(f"/api/lecturer/circles/{circle['id']}/endorse", headers=auth(lec)).json()
-    assert e["endorsed"] == 1
+    meet_res = client.post(
+        f"/api/circles/{circle['id']}/meet",
+        json={"meetUrl": "https://meet.google.com/abc-defg-hij"},
+        headers=h,
+    )
+    assert meet_res.status_code == 200
+    assert meet_res.json()["meetUrl"] == "https://meet.google.com/abc-defg-hij"
+    assert meet_res.json()["meetLive"] is True
 
-    pp = client.get("/api/me/passport", headers=h).json()
-    chain = next(c for r in pp["regions"] for c in r["concepts"] if c["conceptId"] == "chain-rule")
-    assert chain["state"] == "endorsed" and chain["endorsedBy"] == "Dr. Demo Lecturer"
+    chat_res = client.post(f"/api/circles/{circle['id']}/chat", json={"text": "Let's review the chain rule together!"}, headers=h)
+    assert chat_res.status_code == 200
+    assert any("chain rule" in msg["text"] for msg in chat_res.json()["messages"])
+
+    cal_res = client.post(f"/api/circles/{circle['id']}/calendar", headers=h)
+    assert cal_res.status_code == 200
+    assert cal_res.json()["event"]["meetUrl"] == "https://meet.google.com/abc-defg-hij"
+    assert "calendar.google.com/calendar/render" in cal_res.json()["event"]["calendarLink"]
 
 
-def test_passport_customisation(client):
+def test_passport_customisation_with_photo_and_custom_labs(client):
     tok = signup(client).json()["token"]
     me = client.get("/api/me", headers=auth(tok)).json()
-    assert me["passportStyle"] is None  # not set up yet: the app sends new students to the setup page
-    body = {"passport": {"cover": "forest", "emblem": "atom", "displayName": "Nisha R.", "motto": "Own Lab 5",
-                         "focusLabIds": ["lab5", "nope"]}, "programme": "BSc Data Science", "year": 2}
+    assert me["passportStyle"] is None
+    sample_photo = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+    body = {
+        "passport": {
+            "cover": "forest",
+            "photoUrl": sample_photo,
+            "displayName": "Nisha R.",
+            "motto": "Own Calculus & SQL",
+            "focusLabIds": ["T-CM7", "nope"],
+            "customLabs": ["CS302 Distributed Systems Lab"],
+        },
+        "programme": "BSc Data Science",
+        "year": 2,
+    }
     r = client.patch("/api/me", json=body, headers=auth(tok))
     assert r.status_code == 200, r.text
     st = r.json()["passportStyle"]
-    assert st["setupDone"] and st["cover"] == "forest" and st["focusLabIds"] == ["lab5"]
+    assert st["setupDone"] and st["cover"] == "forest" and st["focusLabIds"] == ["T-CM7"]
+    assert st["photoUrl"] == sample_photo and st["customLabs"] == ["CS302 Distributed Systems Lab"]
     pp = client.get("/api/me/passport", headers=auth(tok)).json()
-    assert pp["holder"] == "Nisha R." and pp["style"]["emblem"] == "atom" and pp["focusLabs"] == ["Lab 5: Backpropagation"]
+    assert pp["holder"] == "Nisha R."
+    assert pp["style"]["photoUrl"] == sample_photo
+    assert pp["focusLabs"] == ["CM · Calculus", "CS302 Distributed Systems Lab"]
     assert client.patch("/api/me", json={"passport": {"cover": "neon"}}, headers=auth(tok)).status_code == 400
     assert client.patch("/api/me", json={"passport": {"displayName": "X"}}, headers=auth(tok)).status_code == 400
 
 
 def test_students_cannot_read_each_others_diagnoses(client):
-    a = signup(client, email="a@example.edu").json()["token"]
-    b = signup(client, email="b@example.edu").json()["token"]
-    d = client.post("/api/diagnoses", json={"stuckInput": "softmax help", "targetConceptId": "softmax"}, headers=auth(a)).json()
+    a = signup(client, email="a@gmail.com").json()["token"]
+    b = signup(client, email="b@gmail.com").json()["token"]
+    d = client.post("/api/diagnoses", json={"stuckInput": "SQL joins help", "targetConceptId": "DB-JOIN"}, headers=auth(a)).json()
     assert client.get(f"/api/diagnoses/{d['id']}", headers=auth(b)).status_code == 404
-
-
-def test_moodle_connect_sync_import_and_disconnect(client):
-    import base64
-    import io
-    import zipfile
-
-    tok = signup(client, email="moodle.student@mail.apu.edu.my", studentId="TP088123").json()["token"]
-    st0 = client.get("/api/moodle/status", headers=auth(tok))
-    assert st0.status_code == 200 and st0.json()["connected"] is False
-
-    # Connect APU Moodle feed
-    conn = client.post("/api/moodle/connect", json={"mode": "apu-demo", "baseUrl": "https://lms2.apiit.edu.my"}, headers=auth(tok))
-    assert conn.status_code == 200
-    body = conn.json()
-    assert body["connected"] is True
-    assert len(body["courses"]) >= 3
-    assert len(body["materials"]) >= 4
-    assert len(body["deadlines"]) >= 3
-    assert body["materials"][0]["concepts"] and body["materials"][0]["primaryConceptId"]
-
-    # Passport reflects Moodle connection
-    pp = client.get("/api/me/passport", headers=auth(tok)).json()
-    assert pp["moodle"]["connected"] is True and pp["moodle"]["courseCount"] >= 3
-
-    # Upload a real .pptx slide deck
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w") as zf:
-        zf.writestr(
-            "ppt/slides/slide1.xml",
-            '<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" '
-            'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">'
-            "<a:t>Backpropagation and chain rule gradients in hidden layer weights</a:t></p:sld>",
-        )
-    b64_pptx = base64.b64encode(buf.getvalue()).decode("ascii")
-    imp = client.post(
-        "/api/moodle/import",
-        json={
-            "title": "Uploaded Week 7 Deck",
-            "courseName": "Machine Learning & Neural Networks",
-            "filename": "Week7_Backprop.pptx",
-            "contentBase64": b64_pptx,
-        },
-        headers=auth(tok),
-    )
-    assert imp.status_code == 200
-    imp_data = imp.json()["imported"]
-    assert "Slide 1: Backpropagation" in imp_data["summary"]
-    assert imp_data["primaryConceptId"] is not None
-
-    # Refresh sync preserves imported material
-    refreshed = client.post("/api/moodle/sync", headers=auth(tok))
-    assert refreshed.status_code == 200
-    assert any(m["title"] == "Uploaded Week 7 Deck" for m in refreshed.json()["materials"])
-
-    # Reject private/loopback SSRF URLs and short tokens
-    bad_url = client.post("/api/moodle/check", json={"baseUrl": "http://127.0.0.1:8080"}, headers=auth(tok))
-    assert bad_url.status_code == 400
-    bad_tok = client.post("/api/moodle/connect", json={"mode": "token", "token": "short"}, headers=auth(tok))
-    assert bad_tok.status_code == 400
-
-    # Disconnect
-    disc = client.delete("/api/moodle/connection", headers=auth(tok))
-    assert disc.status_code == 200 and disc.json()["connected"] is False

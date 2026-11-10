@@ -44,11 +44,11 @@ function PassportStill() {
 }
 
 const FLIGHT = [
-  { short: 'Check the basics', title: 'Start with what you already know.', text: 'Describe the topic that has you stuck. Up to five short questions help trace the earlier concepts it depends on.', path: 'M80 220 Q100 150 220 185' },
-  { short: 'Find the gap', title: 'One missing connection comes into view.', text: 'In this example, the chain rule needs attention before backpropagation. An unstamped checkpoint shows where to focus.', path: 'M220 185 C320 95 400 105 480 200' },
-  { short: 'Meet your people', title: 'Take a detour. Learn together.', text: 'Work through an explanation and practice, or join a study circle around the same gap and shared free time. Lecturer sessions need confirmation.', path: 'M480 200 C520 245 510 335 655 335' },
+  { short: 'Check the basics', title: 'Start with what you already know.', text: 'Describe the topic or upload a lab file. Five to ten confidence-weighted questions trace the earlier concepts it depends on.', path: 'M80 220 Q100 150 220 185' },
+  { short: 'Find the gap', title: 'One missing connection comes into view.', text: 'In this example, the chain rule needs attention before gradient descent. An unstamped checkpoint shows where to focus.', path: 'M220 185 C320 95 400 105 480 200' },
+  { short: 'Meet your people', title: 'Take a detour. Learn together.', text: 'Work through an explanation and practice, or join a peer study circle around the same gap with Google Meet, Chat and Calendar.', path: 'M480 200 C520 245 510 335 655 335' },
   { short: 'Return & re-check', title: 'Come back and show what clicked.', text: 'Return to the missed concept for a re-check. A stamp is earned when the check brings your understanding to Solid; joining a group alone does not earn one.', path: 'M655 335 C770 420 330 420 380 280 Q400 230 480 200' },
-  { short: 'Keep moving', title: 'A new stamp. A clearer way forward.', text: 'The earlier gap is cleared. Move on to the next concept and keep building your passport. A lecturer can later countersign an earned stamp.', path: 'M480 200 C590 95 755 100 870 185' },
+  { short: 'Keep moving', title: 'A new stamp. A clearer way forward.', text: 'The earlier gap is cleared. Move on to the next concept and keep building your passport across all six modules.', path: 'M480 200 C590 95 755 100 870 185' },
 ]
 
 function Checkpoint({ x, y, name, number, cleared, active, destination }) {
@@ -181,16 +181,16 @@ function FlightJourney() {
 }
 
 const FAQ = [
-  ['How is this different from asking an AI chatbot?', <>Punca checks the earlier concepts behind your question, then shows the answers that led to its suggested gap. You get a focused explanation with course-note sources, practice, and a re-check. The aim is to help you decide what to learn next.</>],
-  ['What can I study in the prototype?', <>The current prototype covers 37 connected concepts across maths, linear algebra, calculus and machine learning, using a curated question bank and sample course notes. It does not cover every APU module yet.</>],
-  ['How do I earn a passport stamp?', <>Work on a concept and pass re-checks until your understanding reaches Solid. A diagnosis or a study-circle visit alone does not earn a stamp. Lecturers can countersign earned stamps. These are learning aids, not academic grades or qualifications.</>],
-  ['Can I study with other students?', <>Yes. Share your free hours to find a small study circle around a common gap. Punca can suggest a lecturer slot when one is available; the lecturer still needs to confirm. The demonstration cohort uses synthetic students.</>],
-  ['Who can see my gaps and my passport?', <>Sharing your name and passport is opt-in. Lecturer dashboards show aggregate demand and hide groups smaller than three. This is a local hackathon prototype, so use demo details while exploring it.</>],
-  ['Is it free, and what if Punca gets it wrong?', <>The prototype is free to try. Its diagnosis is an estimate, and five questions can miss a deeper gap. You can challenge a result with “I actually know this” and take a re-check. Use the linked notes and your lecturer to check anything uncertain.</>],
+  ['How is this different from asking an AI chatbot?', <>Punca checks the earlier concepts behind your question or uploaded lab document across 5–10 confidence-weighted checks, then shows the exact hard-prerequisite chain that led to its suggested gap. You get a focused explanation with course-note sources, practice, and a re-check.</>],
+  ['What can I study in the prototype?', <>The prototype covers 138 connected concepts across 6 modules and 28 topics: Maths Foundations, Computing Foundations, Computational Mathematics, Introduction to Python, Object Oriented Programming with Java, and Introduction to Databases.</>],
+  ['How do I earn a passport stamp?', <>Work on a concept and pass re-checks until your understanding reaches Solid. A diagnosis or a study-circle visit alone does not earn a stamp. These are personal learning aids, not academic grades or qualifications.</>],
+  ['Can I study with other students?', <>Yes. Share your free hours to find a peer study circle around a common gap, complete with Google Meet video rooms, Google Chat spaces, and Google Calendar scheduling.</>],
+  ['Who can see my gaps and my passport?', <>Your passport is private to you. Sharing your name in a peer study circle is opt-in. This is a local hackathon prototype, so use demo details while exploring it.</>],
+  ['Is it free, and what if Punca gets it wrong?', <>The prototype is free to try. Its diagnosis is an estimate. You can challenge a result with “I actually know this” and take a re-check, or save notes and tasks to Google Docs and Google Tasks.</>],
 ]
 
 export default function LandingPage({ user, onStart, onSignIn }) {
-  const startLabel = user ? (user.role === 'lecturer' ? 'Open my dashboard' : 'Open my passport') : 'Create my passport'
+  const startLabel = user ? 'Open my passport' : 'Create my passport'
   return <div className="pn-landing">
     <a className="pn-skip" href="#pn-main" onClick={e => { e.preventDefault(); jumpTo('pn-main') }}>Skip to content</a>
     <header className="pn-nav">
@@ -205,7 +205,7 @@ export default function LandingPage({ user, onStart, onSignIn }) {
           <h1>Learn with<br /><em>confidence.</em></h1>
           <p className="pn-hero-lead">For the concepts that never quite clicked.<br />Learn, Without the blind spots<br />Identify knowledge gaps. Strengthen your foundations. Learn with confidence.</p>
           <div className="pn-hero-actions"><button className="pn-button" onClick={onStart}>{startLabel}<Arrow diagonal /></button><button className="pn-link-button" onClick={() => jumpTo('pn-journey')}>See the journey <span aria-hidden="true">↓</span></button></div>
-          <p className="pn-hero-foot">Up to 5 questions to find a starting point.<br /><span>Free prototype · Made for APU students</span></p>
+          <p className="pn-hero-foot">5–10 foundation questions to pinpoint your starting point.<br /><span>Free prototype · Made for university students</span></p>
         </div>
         <PassportStill />
       </section>

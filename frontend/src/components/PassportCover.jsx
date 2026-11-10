@@ -28,13 +28,84 @@ export function Emblem({ name = 'spring', size = 28 }) {
   )
 }
 
+/** Default person portrait image shown on the passport when the student has not uploaded a photo. */
+export function DefaultPersonPortrait({ size = 56 }) {
+  return (
+    <svg
+      className="pp-person-svg"
+      viewBox="0 0 64 64"
+      width={size}
+      height={size}
+      role="img"
+      aria-label="Default student portrait"
+    >
+      <defs>
+        <linearGradient id="ppAvatarBg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#264b66" />
+          <stop offset="100%" stopColor="#132c3e" />
+        </linearGradient>
+      </defs>
+      <rect width="64" height="64" rx="12" fill="url(#ppAvatarBg)" />
+      <circle cx="32" cy="24" r="11" fill="#f3ead8" opacity="0.92" />
+      <path
+        d="M14 56c2-11 10-17 18-17s16 6 18 17"
+        fill="#f3ead8"
+        opacity="0.92"
+      />
+      <rect
+        x="1.5"
+        y="1.5"
+        width="61"
+        height="61"
+        rx="10.5"
+        fill="none"
+        stroke="#e5b65a"
+        strokeOpacity="0.65"
+        strokeWidth="1.5"
+      />
+    </svg>
+  )
+}
+
+export function PassportPhoto({ photoUrl, holder, size = 56 }) {
+  if (photoUrl) {
+    return (
+      <span className="pp-photo-frame" style={{ width: size, height: size }}>
+        <img
+          src={photoUrl}
+          alt={holder ? `${holder}'s passport photo` : 'Passport photo'}
+          className="pp-photo-img"
+        />
+      </span>
+    )
+  }
+  return (
+    <span className="pp-photo-frame pp-photo-default" style={{ width: size, height: size }}>
+      <DefaultPersonPortrait size={size} />
+    </span>
+  )
+}
+
 /** The coloured passport cover used on the passport page and as the live preview while customising. */
-export default function PassportCover({ style = {}, holder, holderNo, university, studentId, module, programme, year, focusLabs = [], stamps, endorsed, compact }) {
+export default function PassportCover({
+  style = {},
+  holder,
+  holderNo,
+  university,
+  studentId,
+  module,
+  programme,
+  year,
+  focusLabs = [],
+  stamps,
+  compact,
+}) {
   const cover = COVERS[style.cover] || COVERS.navy
+  const photoSize = compact ? 52 : 64
   return (
     <div className={`pp-cover ${compact ? 'compact' : ''}`} style={{ background: cover.bg }}>
       <div className="pp-brandline">
-        <span className="pp-emblem"><Emblem name={style.emblem} size={compact ? 30 : 36} /></span>
+        <PassportPhoto photoUrl={style.photoUrl} holder={holder} size={photoSize} />
         <div>
           <div className="pp-title">PUNCA PASSPORT</div>
           <div className="pp-sub">Pasport Punca · study aid, not a grade or credential</div>
@@ -42,16 +113,17 @@ export default function PassportCover({ style = {}, holder, holderNo, university
       </div>
       <div className="pp-holder">
         <div><span>Holder</span><b>{holder || 'Your name'}</b></div>
-        <div><span>No.</span><b>{holderNo || 'Student #A-0000'}</b></div>
+        <div><span>No.</span><b>{studentId || holderNo || '—'}</b></div>
         {university && <div><span>University</span><b>{university}</b></div>}
-        {studentId && <div><span>Student ID</span><b>{studentId}</b></div>}
         {programme && <div><span>Course</span><b>{programme}{year ? ` · Year ${year}` : ''}</b></div>}
         <div><span>Module</span><b>{module}</b></div>
-        {focusLabs.length > 0 && <div><span>Trips</span><b>{focusLabs.map((l) => l.split(':')[0]).join(', ')}</b></div>}
+        {focusLabs.length > 0 && (
+          <div><span>Labs</span><b>{focusLabs.map((l) => l.split(':')[0]).join(', ')}</b></div>
+        )}
         {style.motto && <div className="pp-motto">“{style.motto}”</div>}
       </div>
       {stamps !== undefined && (
-        <div className="pp-count"><b>{stamps}</b><span>stamps</span><b>{endorsed}</b><span>endorsed</span></div>
+        <div className="pp-count"><b>{stamps}</b><span>completed stamps</span></div>
       )}
     </div>
   )
