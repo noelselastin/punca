@@ -1,8 +1,9 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { api } from '../api.js'
 import AvailabilityGrid from '../components/AvailabilityGrid.jsx'
 import { CircleCard } from '../components/CirclePanel.jsx'
 import { ErrorNote, Spinner, Toggle, go, useAsync } from '../components/common.jsx'
+import { ensureGoogle, prepareGoogle } from '../googleAuth.js'
 
 /** One suggested study partner: what you have in common, how to reach them, and a circle to join. */
 function PeerCard({ peer, busy, onJoin }) {
@@ -65,6 +66,9 @@ function PeerCard({ peer, busy, onJoin }) {
 export default function CirclesPage({ user, onUser }) {
   const [circles, reloadCircles] = useAsync(() => api('/circles'), [])
   const [peers, reloadPeers] = useAsync(() => api('/circles/peers'), [])
+  useEffect(() => {
+    prepareGoogle()
+  }, [])
   const [avail, setAvail] = useState(user.availability || [])
   const [saved, setSaved] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -104,6 +108,7 @@ export default function CirclesPage({ user, onUser }) {
 
   const addCalendar = async (circleId) => {
     try {
+      await ensureGoogle()
       const res = await api(`/circles/${circleId}/calendar`, { method: 'POST' })
       return res.event
     } catch (e) {

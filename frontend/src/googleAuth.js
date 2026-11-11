@@ -75,3 +75,53 @@ export async function connectGoogle(ws) {
 
 export const GOOGLE_NOT_SET_UP =
   'Google sign-in is not set up on this Punca server yet, so Punca cannot reach your Google account directly.'
+
+// Google's window must open straight after a click, or the browser blocks it as a pop-up.
+// Pages call prepareGoogle() when they load, so the sign-in script is ready before any click.
+export function prepareGoogle() {
+  return api('/google/status')
+    .then((ws) => {
+      if (ws && ws.liveAvailable && !ws.liveConnected) loadGsiScript().catch(() => {})
+      return ws
+    })
+    .catch(() => null)
+}
+
+/**
+ * Call before saving to Google Docs or Google Calendar. If Google sign-in is set up and the student
+ * is not connected yet, Google's window opens with their sign-up Gmail already chosen.
+ * Returns { state: 'connected' | 'unavailable' | 'cancelled', error? }.
+ */
+export async function ensureGoogle() {
+  let ws
+  try {
+    ws = await api('/google/status')
+  } catch (error) {
+    return { state: 'unavailable', error }
+  }
+  if (!ws.liveAvailable) return { state: 'unavailable' }
+  if (ws.liveConnected) return { state: 'connected' }
+  try {
+    await connectGoogle(ws)
+    return { state: 'connected' }
+  } catch (error) {
+    return { state: 'cancelled', error }
+  }
+}
+
+/** One line saying where a note ('doc') or session ('event') actually went. */
+export function savedWhere(kind, item, google, warning) {
+  const name = `"${item.title}"`
+  if (item.live) {
+    return kind === 'doc' ? `Saved ${name} to your Google Docs.` : `Added ${name} to your Google Calendar.`
+  }
+  const here =
+    kind === 'doc'
+      ? `Saved ${name} in your Punca notes (Google Workspace, Google Docs tab)`
+      : `Saved ${name} in Punca`
+  const next = kind === 'doc' ? '' : ' Use "Add to Google Calendar" on it to put it in your calendar.'
+  if (warning) return `${here}. Google did not accept it: ${warning}${next}`
+  if (google && google.state === 'cancelled') return `${here}, because Google sign-in did not finish.${next}`
+  if (google && google.state === 'unavailable') return `${here}. Google sign-in isn't available on this site yet.${next}`
+  return `${here}.${next}`
+}

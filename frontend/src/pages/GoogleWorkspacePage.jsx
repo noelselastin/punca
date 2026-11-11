@@ -1,7 +1,7 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { api } from '../api.js'
 import { ErrorNote, Spinner, Toggle, go, useAsync } from '../components/common.jsx'
-import { GOOGLE_NOT_SET_UP, connectGoogle } from '../googleAuth.js'
+import { GOOGLE_NOT_SET_UP, connectGoogle, ensureGoogle, prepareGoogle, savedWhere } from '../googleAuth.js'
 
 function addOneHourLocal(isoLocal) {
   if (!isoLocal) return ''
@@ -14,6 +14,9 @@ function addOneHourLocal(isoLocal) {
 
 export default function GoogleWorkspacePage() {
   const [ws, reload] = useAsync(() => api('/google/status'), [])
+  useEffect(() => {
+    prepareGoogle()
+  }, [])
   const [tab, setTab] = useState('calendar')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
@@ -80,16 +83,14 @@ export default function GoogleWorkspacePage() {
       await api('/google/disconnect', { method: 'POST' })
     }, 'Google account disconnected. Your sessions, tasks and notes are still in Punca.')
 
-  // Writing to the student's Google account needs a connection. Returns false (with an
-  // explanation on screen) when Google sign-in is not available on this server.
+  // Writing to the student's Google account needs a connection. Opens Google's window when sign-in
+  // is set up; returns false (with an explanation on screen) when it is not available here.
   const ensureLive = async () => {
-    if (data.liveConnected) return true
-    if (!data.liveAvailable) {
-      setNotice(`${GOOGLE_NOT_SET_UP} Use the Open Google links for now.`)
-      return false
-    }
-    await connectGoogle(data)
-    return true
+    const google = await ensureGoogle()
+    if (google.state === 'connected') return true
+    if (google.state === 'unavailable') setNotice(`${GOOGLE_NOT_SET_UP} Use the Open Google links for now.`)
+    else if (google.error) throw google.error
+    return false
   }
 
   const withGoogle = async (fn, msg) => {
@@ -115,14 +116,18 @@ export default function GoogleWorkspacePage() {
       `Added "${ev.title}" to your Google Calendar.`,
     )
 
-  const createCalendarEvent = (e) => {
+  const createCalendarEvent = async (e) => {
     e.preventDefault()
-    act(async () => {
+    setBusy(true)
+    setError(null)
+    setNotice(null)
+    try {
+      const google = await ensureGoogle()
       const attendees = calForm.attendeesText
         .split(',')
         .map((x) => x.trim())
         .filter(Boolean)
-      await api('/google/calendar/events', {
+      const res = await api('/google/calendar/events', {
         method: 'POST',
         body: {
           title: calForm.title,
@@ -143,7 +148,13 @@ export default function GoogleWorkspacePage() {
         meetUrl: '',
         includeMeet: true,
       })
-    }, 'Session scheduled. Use "Add to Google Calendar" on the session to save it in your Google Calendar.')
+      await reload()
+      setNotice(savedWhere('event', res.event, google, res.warning))
+    } catch (err) {
+      setError(err)
+    } finally {
+      setBusy(false)
+    }
   }
 
   const createTask = (e) => {
@@ -167,16 +178,26 @@ export default function GoogleWorkspacePage() {
       })
     })
 
-  const createDoc = (e) => {
+  const createDoc = async (e) => {
     e.preventDefault()
-    act(async () => {
-      await api('/google/docs', {
+    setBusy(true)
+    setError(null)
+    setNotice(null)
+    try {
+      const google = await ensureGoogle()
+      const res = await api('/google/docs', {
         method: 'POST',
         body: { title: docTitle, content: docContent },
       })
       setDocTitle('')
       setDocContent('')
-    }, 'Created study note in Google Docs!')
+      await reload()
+      setNotice(savedWhere('doc', res.doc, google, res.warning))
+    } catch (err) {
+      setError(err)
+    } finally {
+      setBusy(false)
+    }
   }
 
   const saveEditedDoc = (e) => {
@@ -188,7 +209,7 @@ export default function GoogleWorkspacePage() {
         body: { title: editingDoc.title, content: editingDoc.content },
       })
       setEditingDoc(null)
-    }, 'Updated Google Doc!')
+    }, editingDoc.live ? 'Note updated here and in Google Docs.' : 'Note updated in Punca.')
   }
 
   const copyDocNotes = async (doc) => {

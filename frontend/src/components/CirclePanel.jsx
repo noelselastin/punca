@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { api } from '../api.js'
 import { ErrorNote, Spinner, Toggle, useAsync } from './common.jsx'
+import { ensureGoogle, prepareGoogle } from '../googleAuth.js'
 
 /** Who is in a circle: name, course, contact email (when shared) and any free hour in common with you. */
 export function MemberList({ members }) {
@@ -178,7 +179,7 @@ export function CircleCard({ circle, onSendChat, onAddCalendar, onCircleUpdated,
               target="_blank"
               rel="noreferrer"
             >
-              Open in Google Calendar ↗
+              {calEvent.live ? 'Open in Google Calendar ↗' : 'Save in Google Calendar ↗'}
             </a>
           )}
         </div>
@@ -201,10 +202,14 @@ export function CircleCard({ circle, onSendChat, onAddCalendar, onCircleUpdated,
 
       {calEvent && (
         <p className="fine" style={{ marginTop: '0.45rem' }}>
-          <b>Added &ldquo;{calEvent.title}&rdquo; to your study calendar.</b>{' '}
+          <b>
+            {calEvent.live
+              ? <>Added &ldquo;{calEvent.title}&rdquo; to your Google Calendar.</>
+              : <>Saved &ldquo;{calEvent.title}&rdquo; in Punca.</>}
+          </b>{' '}
           {(calEvent.htmlLink || calEvent.calendarLink) && (
             <a href={calEvent.htmlLink || calEvent.calendarLink} target="_blank" rel="noreferrer">
-              Save it to your Google Calendar ↗
+              {calEvent.live ? 'Open it ↗' : 'Save it to your Google Calendar ↗'}
             </a>
           )}
         </p>
@@ -248,6 +253,9 @@ export function CircleCard({ circle, onSendChat, onAddCalendar, onCircleUpdated,
 /** The "Study with peers" step for a diagnosed gap: the circle to join, with who is in it. */
 export default function CirclePanel({ conceptId, user, onUser }) {
   const [state, reload] = useAsync(() => api(`/circles/suggestion?conceptId=${encodeURIComponent(conceptId)}`), [conceptId])
+  useEffect(() => {
+    prepareGoogle()
+  }, [])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
 
@@ -275,6 +283,7 @@ export default function CirclePanel({ conceptId, user, onUser }) {
   }
 
   const addCalendar = async (circleId) => {
+    await ensureGoogle()
     const res = await api(`/circles/${circleId}/calendar`, { method: 'POST' })
     await reload()
     return res.event
