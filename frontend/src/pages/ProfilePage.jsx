@@ -68,20 +68,20 @@ export default function ProfilePage({ user, onUser }) {
         <label className="field">Full name
           <input value={form.name} onChange={set('name')} required minLength={2} maxLength={60} autoComplete="name" />
         </label>
-        <label className="field">Personal Gmail address
+        <label className="field">Personal email address
           <input
             type="email"
             value={form.email}
             onChange={set('email')}
             required
             disabled={demo}
-            placeholder="you@gmail.com"
+            placeholder="you@example.com"
             autoComplete="email"
           />
           <small>
             {demo
               ? 'Demo accounts keep their sign-in email.'
-              : 'You sign in with this address, and it is the Google account Punca connects to.'}
+              : 'You sign in with this address. Study partners see it only if you choose to share it.'}
           </small>
         </label>
         <div className="row2">

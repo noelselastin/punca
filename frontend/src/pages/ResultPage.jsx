@@ -1,10 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { api } from '../api.js'
 import CirclePanel from '../components/CirclePanel.jsx'
 import { ErrorNote, Spinner, StateChip, go, useAsync } from '../components/common.jsx'
 import ConceptMap, { MapLegend } from '../components/ConceptMap.jsx'
 import ProbeCard from '../components/ProbeCard.jsx'
-import { ensureGoogle, prepareGoogle, savedWhere } from '../googleAuth.js'
+import { GOOGLE_TASKS_URL, NEW_GOOGLE_DOC_URL, copyToNewGoogleDoc, googleDocNote } from '../googleLinks.js'
 
 const CONF_LABELS = {
   low: 'Guessing / Unsure',
@@ -103,10 +103,6 @@ export default function ResultPage({ id, catalog, user, onUser }) {
   const [wsNotice, setWsNotice] = useState(null)
   const [wsBusy, setWsBusy] = useState(false)
 
-  useEffect(() => {
-    prepareGoogle()
-  }, [])
-
   const sub = useMemo(() => {
     if (!d.data) return null
     const byId = Object.fromEntries(catalog.concepts.map((c) => [c.id, c]))
@@ -153,32 +149,20 @@ export default function ResultPage({ id, catalog, user, onUser }) {
     }
   }
 
+  // Keeps the notes in Punca, then copies them and opens a new Google Doc to paste them into.
   const saveToGoogleDocs = async () => {
     setWsBusy(true)
     setWsNotice(null)
     try {
-      const google = await ensureGoogle()
       const res = await api(`/google/docs/from-diagnosis/${id}`, { method: 'POST' })
+      const result = await copyToNewGoogleDoc(res.doc.title, res.doc.content)
       setWsNotice({
-        text: savedWhere('doc', res.doc, google, res.warning),
-        link: res.doc.live ? res.doc.url : null,
-        linkLabel: 'Open in Google Docs ↗',
+        text: `Saved in your Punca notes. ${googleDocNote(res.doc.title, result)}`,
+        link: result.opened ? null : NEW_GOOGLE_DOC_URL,
+        linkLabel: 'New Google Doc ↗',
       })
     } catch (e) {
       setWsNotice({ text: `Could not save the notes: ${e.message}` })
-    } finally {
-      setWsBusy(false)
-    }
-  }
-
-  const addToGoogleTasks = async () => {
-    setWsBusy(true)
-    setWsNotice(null)
-    try {
-      const res = await api(`/google/tasks/from-diagnosis/${id}`, { method: 'POST' })
-      setWsNotice({ text: `Added ${res.created.length} step(s) to your study tasks in Google Workspace.` })
-    } catch (e) {
-      setWsNotice({ text: `Could not add the tasks: ${e.message}` })
     } finally {
       setWsBusy(false)
     }
@@ -336,9 +320,9 @@ export default function ResultPage({ id, catalog, user, onUser }) {
                   <button type="button" className="btn small" disabled={wsBusy} onClick={saveToGoogleDocs}>
                     Save notes to Google Docs
                   </button>
-                  <button type="button" className="btn ghost small" disabled={wsBusy} onClick={addToGoogleTasks}>
-                    Add route to my study tasks
-                  </button>
+                  <a className="btn ghost small" href={GOOGLE_TASKS_URL} target="_blank" rel="noreferrer">
+                    Open Google Tasks ↗
+                  </a>
                   <button type="button" className="btn ghost small" onClick={() => go('workspace')}>
                     Open Google Workspace →
                   </button>

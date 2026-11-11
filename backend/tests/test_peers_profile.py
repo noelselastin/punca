@@ -153,7 +153,7 @@ def test_profile_edit_rejects_bad_or_taken_details(client):
     h = auth(signup(client))
     auth(signup(client, "other.student@gmail.com", "TP900002"))
     assert client.patch("/api/me", json={"name": "X"}, headers=h).status_code == 400
-    assert client.patch("/api/me", json={"email": "me@mail.apu.edu.my"}, headers=h).status_code == 400
+    assert client.patch("/api/me", json={"email": "not-an-email"}, headers=h).status_code == 400
     assert client.patch("/api/me", json={"email": "OTHER.student@gmail.com"}, headers=h).status_code == 409
     assert client.patch("/api/me", json={"studentId": "tp900002"}, headers=h).status_code == 409
     assert client.patch("/api/me", json={"studentId": "bad id"}, headers=h).status_code == 400

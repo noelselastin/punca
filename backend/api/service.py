@@ -150,13 +150,7 @@ class PuncaService:
         if not 2 <= len(name) <= 60:
             raise ServiceError(400, "Enter your name (2 to 60 characters).")
         if not auth.valid_email(email):
-            raise ServiceError(400, "Enter a valid personal Gmail address.")
-        if not auth.is_personal_gmail(email):
-            raise ServiceError(
-                400,
-                "Use your personal Gmail address (ending in @gmail.com), not your university email. "
-                "Punca connects Google Calendar and Google Docs to it.",
-            )
+            raise ServiceError(400, "Enter a valid personal email address.")
         if len(password) < 8 or len(password) > 128:
             raise ServiceError(400, "Use a password of at least 8 characters.")
         if password != data.get("confirmPassword"):
@@ -272,9 +266,9 @@ class PuncaService:
             email = (data["email"] or "").strip().lower()
             if email != (user.get("email") or "").lower():
                 if user.get("demoAccount"):
-                    raise ServiceError(400, "Demo accounts keep their sign-in email. Create your own account to use your Gmail.")
-                if not auth.is_personal_gmail(email):
-                    raise ServiceError(400, "Use your personal Gmail address (ending in @gmail.com).")
+                    raise ServiceError(400, "Demo accounts keep their sign-in email. Create your own account to use your email.")
+                if not auth.valid_email(email):
+                    raise ServiceError(400, "Enter a valid personal email address.")
                 if taken("email", email):
                     raise ServiceError(409, "Another account already uses that email.")
                 ws = user.get("googleWorkspace")
@@ -1499,8 +1493,10 @@ class PuncaService:
                 )
             )
         meet_url = (live_res or {}).get("meetUrl") or gws.clean_meet_link(data.get("meetUrl"))
+        # The student saves the event in their own calendar, so they are not listed as a guest.
+        guests = [a for a in typed_attendees if a.lower() != (own_email or "").lower()]
         cal_link = (live_res or {}).get("htmlLink") or gws.calendar_template_link(
-            title[:140], description, start_time, end_time, config.PUNCA_TIMEZONE
+            title[:140], description, start_time, end_time, config.PUNCA_TIMEZONE, guests, meet_url
         )
         ev = {
             "id": "gcal-" + uuid.uuid4().hex[:8],

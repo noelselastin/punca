@@ -51,10 +51,12 @@ def test_student_signup_login_and_me(client):
     assert not {"password", "confirmPassword"} & stored.keys()
 
 
-def test_signup_requires_personal_gmail_address(client):
-    r = signup(client, email="student@university.edu", studentId="TP99999")
-    assert r.status_code == 400
-    assert "gmail.com" in r.json()["error"].lower()
+def test_signup_accepts_any_personal_email(client):
+    r = signup(client, email="student@outlook.com", studentId="TP99999")
+    assert r.status_code == 200, r.text
+    bad = signup(client, email="not-an-email", studentId="TP99998")
+    assert bad.status_code == 400
+    assert "valid personal email" in bad.json()["error"].lower()
 
 
 @pytest.mark.parametrize("field,value", [

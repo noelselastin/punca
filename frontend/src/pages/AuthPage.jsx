@@ -44,9 +44,9 @@ export default function AuthPage({ mode, onAuthed, health }) {
           <>
             <p className="eyebrow auth-eyebrow">YOUR LEARNING JOURNEY</p>
             <p className="tagline">Your next chapter.<br /><em>Starts here.</em></p>
-            <p className="tagline-en">Step 1 of 2: create your student account with your personal Gmail. Next you’ll customise your passport.</p>
+            <p className="tagline-en">Step 1 of 2: create your student account with your personal email. Next you’ll customise your passport.</p>
             <ol className="apply-steps">
-              <li className="on"><b>Your account</b><span>Your personal Gmail (for Google Calendar & Docs), student ID and password</span></li>
+              <li className="on"><b>Your account</b><span>Your personal email, student ID and password</span></li>
               <li><b>Your passport</b><span>Cover, portrait photo, the name on it, your goal and labs</span></li>
               <li><b>Your first stamp</b><span>Tell Punca where you’re stuck; pass a re-check to get stamped</span></li>
             </ol>
@@ -72,22 +72,18 @@ export default function AuthPage({ mode, onAuthed, health }) {
               </>
             )}
             <label>
-              {signup ? 'Personal Gmail address' : 'Email'}
+              {signup ? 'Personal email address' : 'Email'}
               <input
                 name="email"
                 type="email"
                 value={form.email}
                 onChange={set('email')}
                 autoComplete="email"
-                placeholder={signup ? 'you@gmail.com' : 'you@gmail.com'}
+                placeholder="you@example.com"
                 required
                 maxLength={120}
               />
-              {signup && (
-                <small>
-                  Use your personal <b>@gmail.com</b> address (not your university email) — Punca connects Google Calendar and Google Docs to it.
-                </small>
-              )}
+              {signup && <small>Use your personal email, not your university email. You sign in with it.</small>}
             </label>
             {signup && (
               <div className="auth-field-row">

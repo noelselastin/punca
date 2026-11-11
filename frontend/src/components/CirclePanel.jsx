@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { api } from '../api.js'
 import { ErrorNote, Spinner, Toggle, useAsync } from './common.jsx'
-import { ensureGoogle, prepareGoogle } from '../googleAuth.js'
+import { NEW_MEET_URL, openInNewTab } from '../googleLinks.js'
 
 /** Who is in a circle: name, course, contact email (when shared) and any free hour in common with you. */
 export function MemberList({ members }) {
@@ -32,6 +32,7 @@ export function CircleCard({ circle, onSendChat, onAddCalendar, onCircleUpdated,
   const [chatText, setChatText] = useState('')
   const [chatBusy, setChatBusy] = useState(false)
   const [calEvent, setCalEvent] = useState(null)
+  const [calOpened, setCalOpened] = useState(false)
   const [meetUrl, setMeetUrl] = useState(circle.meetUrl || '')
   const [meetLive, setMeetLive] = useState(Boolean(circle.meetLive || circle.meetUrl))
   const [meetInput, setMeetInput] = useState('')
@@ -63,10 +64,12 @@ export function CircleCard({ circle, onSendChat, onAddCalendar, onCircleUpdated,
     }
   }
 
+  // Saves the session in Punca, then opens Google Calendar with it filled in, ready to save there.
   const handleCalendar = async () => {
     if (!onAddCalendar) return
     const ev = await onAddCalendar(circle.id)
     if (ev) {
+      setCalOpened(ev.live ? false : openInNewTab(ev.calendarLink))
       setCalEvent(ev)
       if (ev.meetUrl && !meetUrl) {
         setMeetUrl(ev.meetUrl)
@@ -98,7 +101,7 @@ export function CircleCard({ circle, onSendChat, onAddCalendar, onCircleUpdated,
     }
   }
 
-  const startMeetHref = circle.meetNewUrl || 'https://meet.google.com/new'
+  const startMeetHref = circle.meetNewUrl || NEW_MEET_URL
   const isMember = circle.id !== 'proposal' && circle.isMember !== false
   const whenNote = !circle.slotAgreed
     ? null
@@ -169,18 +172,8 @@ export function CircleCard({ circle, onSendChat, onAddCalendar, onCircleUpdated,
           )}
           {onAddCalendar && (
             <button type="button" className="btn ghost small" onClick={handleCalendar}>
-              Add to Google Calendar
+              Add to Google Calendar ↗
             </button>
-          )}
-          {calEvent && (calEvent.htmlLink || calEvent.calendarLink) && (
-            <a
-              className="btn small"
-              href={calEvent.htmlLink || calEvent.calendarLink}
-              target="_blank"
-              rel="noreferrer"
-            >
-              {calEvent.live ? 'Open in Google Calendar ↗' : 'Save in Google Calendar ↗'}
-            </a>
           )}
         </div>
       )}
@@ -205,11 +198,13 @@ export function CircleCard({ circle, onSendChat, onAddCalendar, onCircleUpdated,
           <b>
             {calEvent.live
               ? <>Added &ldquo;{calEvent.title}&rdquo; to your Google Calendar.</>
-              : <>Saved &ldquo;{calEvent.title}&rdquo; in Punca.</>}
+              : calOpened
+                ? <>Saved &ldquo;{calEvent.title}&rdquo; in Punca and opened it in Google Calendar. Press Save there to add it.</>
+                : <>Saved &ldquo;{calEvent.title}&rdquo; in Punca.</>}
           </b>{' '}
           {(calEvent.htmlLink || calEvent.calendarLink) && (
             <a href={calEvent.htmlLink || calEvent.calendarLink} target="_blank" rel="noreferrer">
-              {calEvent.live ? 'Open it ↗' : 'Save it to your Google Calendar ↗'}
+              {calEvent.live ? 'Open it ↗' : calOpened ? 'Open it again ↗' : 'Add it to Google Calendar ↗'}
             </a>
           )}
         </p>
@@ -253,9 +248,6 @@ export function CircleCard({ circle, onSendChat, onAddCalendar, onCircleUpdated,
 /** The "Study with peers" step for a diagnosed gap: the circle to join, with who is in it. */
 export default function CirclePanel({ conceptId, user, onUser }) {
   const [state, reload] = useAsync(() => api(`/circles/suggestion?conceptId=${encodeURIComponent(conceptId)}`), [conceptId])
-  useEffect(() => {
-    prepareGoogle()
-  }, [])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
 
@@ -283,9 +275,9 @@ export default function CirclePanel({ conceptId, user, onUser }) {
   }
 
   const addCalendar = async (circleId) => {
-    await ensureGoogle()
+    // No reload here: it would swap in a fresh card and hide the "Saved…" note. Adding a session
+    // does not change the circle itself.
     const res = await api(`/circles/${circleId}/calendar`, { method: 'POST' })
-    await reload()
     return res.event
   }
 

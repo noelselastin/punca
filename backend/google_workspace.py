@@ -186,15 +186,28 @@ def one_hour_after(start: str) -> str:
     return (dt + timedelta(hours=1)).isoformat(timespec="minutes" if dt.second == 0 and len(start) <= 16 else "seconds")
 
 
-def calendar_template_link(title: str, description: str, start: str, end: str, time_zone: str) -> str | None:
+def calendar_template_link(
+    title: str,
+    description: str,
+    start: str,
+    end: str,
+    time_zone: str,
+    guests: list[str] | None = None,
+    location: str | None = None,
+) -> str | None:
     """A link that opens Google Calendar with this event filled in, ready for the student to save.
 
-    Used when no live Google sign-in is active: it needs no API access, only a signed-in browser.
+    It needs no API access, only a browser signed in to Google. Guests and a Meet room link are
+    filled in too when given.
     """
     s, e = parse_time(start), parse_time(end)
     if not s or not e:
         return None
     params = {"action": "TEMPLATE", "text": title, "details": description or ""}
+    if location:
+        params["location"] = location
+    if guests:
+        params["add"] = ",".join(guests)
     if s.tzinfo and e.tzinfo:
         fmt = "%Y%m%dT%H%M%SZ"
         params["dates"] = f"{s.astimezone(timezone.utc).strftime(fmt)}/{e.astimezone(timezone.utc).strftime(fmt)}"

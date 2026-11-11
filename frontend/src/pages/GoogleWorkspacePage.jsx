@@ -1,7 +1,14 @@
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import { api } from '../api.js'
-import { ErrorNote, Spinner, Toggle, go, useAsync } from '../components/common.jsx'
-import { GOOGLE_NOT_SET_UP, connectGoogle, ensureGoogle, prepareGoogle, savedWhere } from '../googleAuth.js'
+import { ErrorNote, Spinner, Toggle, useAsync } from '../components/common.jsx'
+import {
+  GOOGLE_TASKS_URL,
+  NEW_GOOGLE_DOC_URL,
+  NEW_MEET_URL,
+  copyToNewGoogleDoc,
+  googleDocNote,
+  openInNewTab,
+} from '../googleLinks.js'
 
 function addOneHourLocal(isoLocal) {
   if (!isoLocal) return ''
@@ -12,46 +19,26 @@ function addOneHourLocal(isoLocal) {
   return `${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}T${pad(end.getHours())}:${pad(end.getMinutes())}`
 }
 
+const EMPTY_SESSION = { title: '', description: '', startTime: '', endTime: '', attendeesText: '', meetUrl: '' }
+
 export default function GoogleWorkspacePage() {
   const [ws, reload] = useAsync(() => api('/google/status'), [])
-  useEffect(() => {
-    prepareGoogle()
-  }, [])
   const [tab, setTab] = useState('calendar')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
+  // { text, link?, linkLabel? }
   const [notice, setNotice] = useState(null)
 
-  // Calendar form state
-  const [calForm, setCalForm] = useState({
-    title: '',
-    description: '',
-    startTime: '',
-    endTime: '',
-    attendeesText: '',
-    meetUrl: '',
-    includeMeet: true,
-  })
+  const [calForm, setCalForm] = useState(EMPTY_SESSION)
 
-  // Tasks form state
-  const [taskTitle, setTaskTitle] = useState('')
-  const [taskNotes, setTaskNotes] = useState('')
-  const [taskDue, setTaskDue] = useState('')
-
-  // Docs form state
   const [docTitle, setDocTitle] = useState('')
   const [docContent, setDocContent] = useState('')
   const [editingDoc, setEditingDoc] = useState(null)
 
-  // Chat & Meet form state
   const [spaceName, setSpaceName] = useState('')
   const [spaceMeetUrl, setSpaceMeetUrl] = useState('')
   const [chatInputs, setChatInputs] = useState({})
   const [spaceMeetInputs, setSpaceMeetInputs] = useState({})
-
-  // Customize form state
-  const [oauthEmail, setOauthEmail] = useState('')
-  const [oauthToken, setOauthToken] = useState('')
 
   if (ws.loading) return <Spinner label="Loading Google Workspace" />
   if (ws.error) return <ErrorNote error={ws.error} />
@@ -65,7 +52,7 @@ export default function GoogleWorkspacePage() {
     try {
       await fn()
       await reload()
-      if (msg) setNotice(msg)
+      if (msg) setNotice({ text: msg })
     } catch (e) {
       setError(e)
     } finally {
@@ -73,56 +60,13 @@ export default function GoogleWorkspacePage() {
     }
   }
 
-  const handleLiveGoogleConnect = () =>
-    act(async () => {
-      await connectGoogle(data)
-    }, 'Google account connected. Calendar and Docs now use your own Google account.')
-
-  const handleLiveGoogleDisconnect = () =>
-    act(async () => {
-      await api('/google/disconnect', { method: 'POST' })
-    }, 'Google account disconnected. Your sessions, tasks and notes are still in Punca.')
-
-  // Writing to the student's Google account needs a connection. Opens Google's window when sign-in
-  // is set up; returns false (with an explanation on screen) when it is not available here.
-  const ensureLive = async () => {
-    const google = await ensureGoogle()
-    if (google.state === 'connected') return true
-    if (google.state === 'unavailable') setNotice(`${GOOGLE_NOT_SET_UP} Use the Open Google links for now.`)
-    else if (google.error) throw google.error
-    return false
-  }
-
-  const withGoogle = async (fn, msg) => {
-    setBusy(true)
-    setError(null)
-    setNotice(null)
-    try {
-      if (await ensureLive()) {
-        await fn()
-        if (msg) setNotice(msg)
-      }
-      await reload()
-    } catch (e) {
-      setError(e)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const addEventToGoogle = (ev) =>
-    withGoogle(
-      () => api(`/google/calendar/events/${ev.id}/sync`, { method: 'POST' }),
-      `Added "${ev.title}" to your Google Calendar.`,
-    )
-
+  // Saves the session in Punca, then opens Google Calendar with it filled in, ready to save there.
   const createCalendarEvent = async (e) => {
     e.preventDefault()
     setBusy(true)
     setError(null)
     setNotice(null)
     try {
-      const google = await ensureGoogle()
       const attendees = calForm.attendeesText
         .split(',')
         .map((x) => x.trim())
@@ -135,21 +79,18 @@ export default function GoogleWorkspacePage() {
           startTime: calForm.startTime || undefined,
           endTime: calForm.endTime || undefined,
           meetUrl: calForm.meetUrl.trim() || undefined,
-          includeMeet: calForm.includeMeet,
           attendees,
         },
       })
-      setCalForm({
-        title: '',
-        description: '',
-        startTime: '',
-        endTime: '',
-        attendeesText: '',
-        meetUrl: '',
-        includeMeet: true,
-      })
+      const ev = res.event
+      const opened = openInNewTab(ev.calendarLink)
+      setCalForm(EMPTY_SESSION)
       await reload()
-      setNotice(savedWhere('event', res.event, google, res.warning))
+      setNotice(
+        opened
+          ? { text: `Saved "${ev.title}" in Punca and opened it in Google Calendar. Press Save there to add it.` }
+          : { text: `Saved "${ev.title}" in Punca.`, link: ev.calendarLink, linkLabel: 'Add it to Google Calendar ↗' },
+      )
     } catch (err) {
       setError(err)
     } finally {
@@ -157,42 +98,35 @@ export default function GoogleWorkspacePage() {
     }
   }
 
-  const createTask = (e) => {
-    e.preventDefault()
-    act(async () => {
-      await api('/google/tasks', {
-        method: 'POST',
-        body: { title: taskTitle, notes: taskNotes, due: taskDue || undefined },
-      })
-      setTaskTitle('')
-      setTaskNotes('')
-      setTaskDue('')
-    }, 'Task added to your study tasks.')
+  const openDocInGoogle = async (doc) => {
+    const result = await copyToNewGoogleDoc(doc.title, doc.content)
+    setNotice({
+      text: googleDocNote(doc.title, result),
+      link: result.opened ? null : NEW_GOOGLE_DOC_URL,
+      linkLabel: 'New Google Doc ↗',
+    })
   }
 
-  const toggleTask = (t) =>
-    act(async () => {
-      await api(`/google/tasks/${t.id}`, {
-        method: 'PATCH',
-        body: { completed: !t.completed },
-      })
-    })
-
+  // Saves the note in Punca, then copies it and opens a new Google Doc to paste it into.
   const createDoc = async (e) => {
     e.preventDefault()
     setBusy(true)
     setError(null)
     setNotice(null)
     try {
-      const google = await ensureGoogle()
       const res = await api('/google/docs', {
         method: 'POST',
         body: { title: docTitle, content: docContent },
       })
+      const result = await copyToNewGoogleDoc(res.doc.title, res.doc.content)
       setDocTitle('')
       setDocContent('')
       await reload()
-      setNotice(savedWhere('doc', res.doc, google, res.warning))
+      setNotice({
+        text: `Saved in Punca. ${googleDocNote(res.doc.title, result)}`,
+        link: result.opened ? null : NEW_GOOGLE_DOC_URL,
+        linkLabel: 'New Google Doc ↗',
+      })
     } catch (err) {
       setError(err)
     } finally {
@@ -209,16 +143,7 @@ export default function GoogleWorkspacePage() {
         body: { title: editingDoc.title, content: editingDoc.content },
       })
       setEditingDoc(null)
-    }, editingDoc.live ? 'Note updated here and in Google Docs.' : 'Note updated in Punca.')
-  }
-
-  const copyDocNotes = async (doc) => {
-    try {
-      await navigator.clipboard.writeText(`${doc.title}\n\n${doc.content || ''}`)
-      setNotice(`Copied "${doc.title}" to clipboard — paste directly into Google Docs!`)
-    } catch {
-      setNotice('Could not copy automatically — select the text to copy.')
-    }
+    }, 'Note updated in Punca.')
   }
 
   const createChatSpace = (e) => {
@@ -265,52 +190,22 @@ export default function GoogleWorkspacePage() {
       })
     }, 'Setting updated.')
 
-  const saveCustomization = (e) => {
-    e.preventDefault()
-    act(async () => {
-      const body = {}
-      if (oauthEmail.trim()) body.email = oauthEmail.trim()
-      if (oauthToken.trim()) body.accessToken = oauthToken.trim()
-      await api('/google/configure', { method: 'POST', body })
-      setOauthToken('')
-    }, 'Workspace settings saved.')
-  }
-
   return (
     <div className="workspace-page">
       <div className="card hero-card">
-        <div className="ws-conn-bar">
-          <div>
-            <div className="eyebrow">
-              Google Workspace Integration · Personal Gmail: <b>{data.email}</b>
-            </div>
-            <h1 className="h1">Your Google Study Workspace</h1>
-          </div>
-          <div className="ws-conn-actions">
-            <span className={`chip ${data.liveConnected ? 'state-stamped' : 'state-endorsed'}`}>
-              {data.liveConnected ? '● Google account connected' : '● Google account not connected'}
-            </span>
-            {data.liveAvailable && !data.liveConnected && (
-              <button type="button" className="btn small primary" disabled={busy} onClick={handleLiveGoogleConnect}>
-                Connect Google Account
-              </button>
-            )}
-            {data.liveConnected && (
-              <button type="button" className="btn ghost small" disabled={busy} onClick={handleLiveGoogleDisconnect}>
-                Disconnect Google
-              </button>
-            )}
-          </div>
-        </div>
+        <div className="eyebrow">Google Workspace</div>
+        <h1 className="h1">Your Google Study Workspace</h1>
         <p className="muted">
-          Schedule study sessions in <b>Google Calendar</b>, keep a study to-do list, talk to your study circle with chat and <b>Google Meet</b>, and keep notes in <b>Google Docs</b>.
+          Plan study sessions for <b>Google Calendar</b>, keep your to-do list in <b>Google Tasks</b>, meet your study
+          circle on <b>Google Meet</b>, and keep notes in <b>Google Docs</b>. Punca keeps a copy here and opens each
+          Google app in a new tab, in whichever Google account you are signed in to.
         </p>
         <div className="pp-tabs" style={{ marginTop: '1rem' }}>
           <button className={tab === 'calendar' ? 'on' : ''} onClick={() => setTab('calendar')}>
             Google Calendar ({(data.calendarEvents || []).length})
           </button>
           <button className={tab === 'tasks' ? 'on' : ''} onClick={() => setTab('tasks')}>
-            Study tasks ({(data.tasks || []).filter((t) => !t.completed).length} open)
+            Google Tasks
           </button>
           <button className={tab === 'chat' ? 'on' : ''} onClick={() => setTab('chat')}>
             Chat and Google Meet ({(data.chatSpaces || []).length})
@@ -319,10 +214,20 @@ export default function GoogleWorkspacePage() {
             Google Docs ({(data.docs || []).length})
           </button>
           <button className={tab === 'settings' ? 'on' : ''} onClick={() => setTab('settings')}>
-            Customize &amp; Access
+            Customize
           </button>
         </div>
-        {notice && <p className="fine" style={{ marginTop: '0.6rem' }}><b>{notice}</b></p>}
+        {notice && (
+          <p className="fine" style={{ marginTop: '0.6rem' }}>
+            <b>{notice.text}</b>
+            {notice.link && (
+              <>
+                {' '}
+                <a href={notice.link} target="_blank" rel="noreferrer">{notice.linkLabel}</a>
+              </>
+            )}
+          </p>
+        )}
         <ErrorNote error={error} />
       </div>
 
@@ -350,25 +255,17 @@ export default function GoogleWorkspacePage() {
                       )}
                     </div>
                     <div className="actions left">
-                      {ev.live ? (
-                        <a className="btn small" href={ev.calendarLink} target="_blank" rel="noreferrer">
-                          Open in Google Calendar ↗
+                      {ev.calendarLink && (
+                        <a className={`btn small${ev.live ? '' : ' primary'}`} href={ev.calendarLink} target="_blank" rel="noreferrer">
+                          {ev.live ? 'Open in Google Calendar ↗' : 'Add to Google Calendar ↗'}
                         </a>
-                      ) : data.liveConnected ? (
-                        <button type="button" className="btn small primary" disabled={busy} onClick={() => addEventToGoogle(ev)}>
-                          Add to Google Calendar
-                        </button>
-                      ) : ev.calendarLink ? (
-                        <a className="btn small primary" href={ev.calendarLink} target="_blank" rel="noreferrer">
-                          Add to Google Calendar ↗
-                        </a>
-                      ) : null}
+                      )}
                       {ev.meetUrl ? (
                         <a className="btn small" href={ev.meetUrl} target="_blank" rel="noreferrer">
                           Join Google Meet ↗
                         </a>
                       ) : (
-                        <a className="btn ghost small" href="https://meet.google.com/new" target="_blank" rel="noreferrer">
+                        <a className="btn ghost small" href={NEW_MEET_URL} target="_blank" rel="noreferrer">
                           Start Google Meet ↗
                         </a>
                       )}
@@ -418,16 +315,16 @@ export default function GoogleWorkspacePage() {
                 />
               </label>
             </div>
-            <label className="field">Peer Gmail Addresses <small>(comma-separated, optional)</small>
+            <label className="field">Peer email addresses <small>(comma-separated, optional)</small>
               <input
                 value={calForm.attendeesText}
                 onChange={(e) => setCalForm({ ...calForm, attendeesText: e.target.value })}
-                placeholder="friend.one@gmail.com, friend.two@gmail.com"
+                placeholder="friend.one@example.com, friend.two@example.com"
               />
             </label>
             <label className="field">
               <span>
-                Google Meet Room Link <small>(optional — <a href="https://meet.google.com/new" target="_blank" rel="noreferrer">start a room at meet.google.com/new ↗</a>)</small>
+                Google Meet Room Link <small>(optional — <a href={NEW_MEET_URL} target="_blank" rel="noreferrer">start a room at meet.google.com/new ↗</a>)</small>
               </span>
               <input
                 type="url"
@@ -444,13 +341,7 @@ export default function GoogleWorkspacePage() {
                 placeholder="What concepts or lab questions will the group cover?"
               />
             </label>
-            {data.liveConnected && (
-              <Toggle
-                checked={calForm.includeMeet}
-                label="Create a Google Meet room for this session automatically"
-                onChange={(v) => setCalForm({ ...calForm, includeMeet: v })}
-              />
-            )}
+            <p className="fine">Google Calendar opens in a new tab with the session filled in. Press Save there to add it.</p>
             <div className="actions">
               <button className="btn primary" disabled={busy || !calForm.title.trim()}>
                 Schedule Session
@@ -460,80 +351,21 @@ export default function GoogleWorkspacePage() {
         </div>
       )}
 
-      {/* ---- STUDY TASKS ---- */}
+      {/* ---- GOOGLE TASKS ---- */}
       {tab === 'tasks' && (
-        <div className="grid2 top">
-          <div className="card">
-            <div className="ws-section-head">
-              <div>
-                <div className="eyebrow">Study to-do list</div>
-                <h2 className="h2">My study tasks</h2>
-              </div>
-            </div>
-            {(data.tasks || []).length === 0 ? (
-              <p className="muted">No tasks yet. Add a task on the right or export a remediation route from a diagnosis result.</p>
-            ) : (
-              <div className="ws-list">
-                {data.tasks.map((t) => (
-                  <div key={t.id} className={`ws-item task-row ${t.completed ? 'task-done' : ''}`}>
-                    <label className="task-check-label">
-                      <input
-                        type="checkbox"
-                        checked={Boolean(t.completed)}
-                        onChange={() => toggleTask(t)}
-                      />
-                      <div>
-                        <b className={t.completed ? 'strike' : ''}>{t.title}</b>
-                        {t.notes && <div className="fine">{t.notes}</div>}
-                        {t.due && <div className="fine">Due: {t.due}</div>}
-                      </div>
-                    </label>
-                    <button
-                      type="button"
-                      className="btn ghost small"
-                      disabled={busy}
-                      onClick={() => act(() => api(`/google/tasks/${t.id}`, { method: 'DELETE' }))}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
+        <div className="card">
+          <div className="eyebrow">Google Tasks · Study to-do list</div>
+          <h2 className="h2">Keep your study to-do list in Google Tasks</h2>
+          <p className="muted">
+            Open Google Tasks and add the steps you want to remember there, for example each stop on the rebuild
+            route from your latest diagnosis, and the re-check that earns your stamp. Tasks with a date also show up
+            in Google Calendar.
+          </p>
+          <div className="actions left">
+            <a className="btn primary" href={GOOGLE_TASKS_URL} target="_blank" rel="noreferrer">
+              Open Google Tasks ↗
+            </a>
           </div>
-
-          <form className="card" onSubmit={createTask}>
-            <div className="eyebrow">Add a to-do item</div>
-            <h2 className="h2">New task</h2>
-            <label className="field">Task title
-              <input
-                value={taskTitle}
-                onChange={(e) => setTaskTitle(e.target.value)}
-                placeholder="e.g. Complete re-check for Chain Rule"
-                required
-              />
-            </label>
-            <label className="field">Due date <small>(optional)</small>
-              <input
-                type="date"
-                value={taskDue}
-                onChange={(e) => setTaskDue(e.target.value)}
-              />
-            </label>
-            <label className="field">Notes <small>(optional)</small>
-              <textarea
-                rows={3}
-                value={taskNotes}
-                onChange={(e) => setTaskNotes(e.target.value)}
-                placeholder="Key steps or lab exercises to finish..."
-              />
-            </label>
-            <div className="actions">
-              <button className="btn primary" disabled={busy || !taskTitle.trim()}>
-                Add task
-              </button>
-            </div>
-          </form>
         </div>
       )}
 
@@ -561,7 +393,7 @@ export default function GoogleWorkspacePage() {
                         Join Google Meet ↗
                       </a>
                     ) : (
-                      <a className="btn small" href={sp.meetNewUrl || 'https://meet.google.com/new'} target="_blank" rel="noreferrer">
+                      <a className="btn small" href={sp.meetNewUrl || NEW_MEET_URL} target="_blank" rel="noreferrer">
                         Start Google Meet ↗
                       </a>
                     )}
@@ -618,7 +450,7 @@ export default function GoogleWorkspacePage() {
             <h2 className="h2">New discussion space</h2>
             <p className="muted">
               Create a dedicated space for your peer study group. Start a video room at{' '}
-              <a href="https://meet.google.com/new" target="_blank" rel="noreferrer">meet.google.com/new ↗</a>{' '}
+              <a href={NEW_MEET_URL} target="_blank" rel="noreferrer">meet.google.com/new ↗</a>{' '}
               and paste the link if you want it pinned to the space.
             </p>
             <label className="field">Space Name
@@ -638,7 +470,7 @@ export default function GoogleWorkspacePage() {
               />
             </label>
             <div className="actions">
-              <a className="btn ghost small" href="https://meet.google.com/new" target="_blank" rel="noreferrer">
+              <a className="btn ghost small" href={NEW_MEET_URL} target="_blank" rel="noreferrer">
                 Start a Meet room ↗
               </a>
               <button className="btn primary" disabled={busy || !spaceName.trim()}>
@@ -658,10 +490,13 @@ export default function GoogleWorkspacePage() {
                 <div className="eyebrow">Google Docs · Study Notes &amp; Explanations</div>
                 <h2 className="h2">Saved Study Docs</h2>
               </div>
-              <a className="btn ghost small" href="https://docs.google.com/document/create" target="_blank" rel="noreferrer">
+              <a className="btn ghost small" href={NEW_GOOGLE_DOC_URL} target="_blank" rel="noreferrer">
                 Blank Google Doc ↗
               </a>
             </div>
+            {(data.docs || []).length === 0 && (
+              <p className="muted">No notes yet. Write one on the right, or save the explanation from a diagnosis result.</p>
+            )}
             {(data.docs || []).map((doc) => (
               <div key={doc.id} className="ws-item">
                 <div className="ws-item-main">
@@ -670,22 +505,23 @@ export default function GoogleWorkspacePage() {
                   <pre className="doc-preview">{doc.content}</pre>
                 </div>
                 <div className="actions left">
-                  <button type="button" className="btn small" onClick={() => setEditingDoc({ ...doc })}>
-                    Edit notes
-                  </button>
-                  <button type="button" className="btn ghost small" onClick={() => copyDocNotes(doc)}>
-                    Copy notes
-                  </button>
-                  {doc.url && (
+                  {doc.url ? (
                     <a className="btn small primary" href={doc.url} target="_blank" rel="noreferrer">
                       Open in Google Docs ↗
                     </a>
+                  ) : (
+                    <button type="button" className="btn small primary" onClick={() => openDocInGoogle(doc)}>
+                      Copy into Google Docs ↗
+                    </button>
                   )}
+                  <button type="button" className="btn small" onClick={() => setEditingDoc({ ...doc })}>
+                    Edit notes
+                  </button>
                   <button
                     type="button"
                     className="btn ghost small"
                     disabled={busy}
-                    onClick={() => act(() => api(`/google/docs/${doc.id}`, { method: 'DELETE' }), 'Deleted Google Doc.')}
+                    onClick={() => act(() => api(`/google/docs/${doc.id}`, { method: 'DELETE' }), 'Deleted the note from Punca.')}
                   >
                     Delete
                   </button>
@@ -741,9 +577,10 @@ export default function GoogleWorkspacePage() {
                   placeholder="Write your revision notes, code snippets, or key takeaways..."
                 />
               </label>
+              <p className="fine">Punca keeps the note, copies it, and opens a new Google Doc for you to paste it into.</p>
               <div className="actions">
                 <button className="btn primary" disabled={busy || !docTitle.trim()}>
-                  Create Study Doc
+                  Save and open in Google Docs
                 </button>
               </div>
             </form>
@@ -751,72 +588,34 @@ export default function GoogleWorkspacePage() {
         </div>
       )}
 
-      {/* ---- CUSTOMIZE & ACCESS ---- */}
+      {/* ---- CUSTOMIZE ---- */}
       {tab === 'settings' && (
-        <div className="grid2 top">
-          <div className="card">
-            <div className="eyebrow">Customize Enabled Services</div>
-            <h2 className="h2">Google Workspace Modules</h2>
-            <p className="muted">Choose which Google Workspace tools are active in your Punca account.</p>
-            <div className="consents">
-              <Toggle
-                checked={enabled.calendar !== false}
-                label="Google Calendar (Peer group & study session scheduling)"
-                onChange={(v) => toggleService('calendar', v)}
-              />
-              <Toggle
-                checked={enabled.tasks !== false}
-                label="Study tasks (to-do list and remediation steps)"
-                onChange={(v) => toggleService('tasks', v)}
-              />
-              <Toggle
-                checked={enabled.chat !== false}
-                label="Circle chat (study circle discussion threads)"
-                onChange={(v) => toggleService('chat', v)}
-              />
-              <Toggle
-                checked={enabled.meet !== false}
-                label="Google Meet (Video meeting links for study circles)"
-                onChange={(v) => toggleService('meet', v)}
-              />
-              <Toggle
-                checked={enabled.docs !== false}
-                label="Google Docs (Study notes & saved explanations)"
-                onChange={(v) => toggleService('docs', v)}
-              />
-            </div>
+        <div className="card">
+          <div className="eyebrow">Customize Enabled Services</div>
+          <h2 className="h2">Google Workspace Modules</h2>
+          <p className="muted">Choose which Google Workspace tools are active in your Punca account.</p>
+          <div className="consents">
+            <Toggle
+              checked={enabled.calendar !== false}
+              label="Google Calendar (Peer group & study session scheduling)"
+              onChange={(v) => toggleService('calendar', v)}
+            />
+            <Toggle
+              checked={enabled.chat !== false}
+              label="Circle chat (study circle discussion threads)"
+              onChange={(v) => toggleService('chat', v)}
+            />
+            <Toggle
+              checked={enabled.meet !== false}
+              label="Google Meet (Video meeting links for study circles)"
+              onChange={(v) => toggleService('meet', v)}
+            />
+            <Toggle
+              checked={enabled.docs !== false}
+              label="Google Docs (Study notes & saved explanations)"
+              onChange={(v) => toggleService('docs', v)}
+            />
           </div>
-
-          <form className="card" onSubmit={saveCustomization}>
-            <div className="eyebrow">Account</div>
-            <h2 className="h2">Personal Gmail &amp; OAuth Access</h2>
-            <label className="field">Connected Personal Gmail Address
-              <input
-                type="email"
-                value={oauthEmail}
-                onChange={(e) => setOauthEmail(e.target.value)}
-                placeholder={data.email || 'yourname@gmail.com'}
-              />
-            </label>
-            <label className="field">Temporary Google access token <small>(testers only: connects your Google account without the sign-in window)</small>
-              <input
-                type="password"
-                value={oauthToken}
-                onChange={(e) => setOauthToken(e.target.value)}
-                placeholder="ya29.a0..."
-              />
-            </label>
-            <div className="actions">
-              {data.liveAvailable && (
-                <button type="button" className="btn ghost" disabled={busy} onClick={handleLiveGoogleConnect}>
-                  Connect Google account
-                </button>
-              )}
-              <button className="btn primary" disabled={busy}>
-                Save Workspace Settings
-              </button>
-            </div>
-          </form>
         </div>
       )}
     </div>
