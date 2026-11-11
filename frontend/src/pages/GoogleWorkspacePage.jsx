@@ -31,6 +31,11 @@ export default function GoogleWorkspacePage() {
 
   const [calForm, setCalForm] = useState(EMPTY_SESSION)
 
+  // Study tasks are kept in Punca (Google Tasks has no link that adds a task for you).
+  const [taskTitle, setTaskTitle] = useState('')
+  const [taskNotes, setTaskNotes] = useState('')
+  const [taskDue, setTaskDue] = useState('')
+
   const [docTitle, setDocTitle] = useState('')
   const [docContent, setDocContent] = useState('')
   const [editingDoc, setEditingDoc] = useState(null)
@@ -97,6 +102,27 @@ export default function GoogleWorkspacePage() {
       setBusy(false)
     }
   }
+
+  const createTask = (e) => {
+    e.preventDefault()
+    act(async () => {
+      await api('/google/tasks', {
+        method: 'POST',
+        body: { title: taskTitle, notes: taskNotes, due: taskDue || undefined },
+      })
+      setTaskTitle('')
+      setTaskNotes('')
+      setTaskDue('')
+    }, 'Task added to your study tasks.')
+  }
+
+  const toggleTask = (t) =>
+    act(async () => {
+      await api(`/google/tasks/${t.id}`, {
+        method: 'PATCH',
+        body: { completed: !t.completed },
+      })
+    })
 
   const openDocInGoogle = async (doc) => {
     const result = await copyToNewGoogleDoc(doc.title, doc.content)
@@ -196,16 +222,16 @@ export default function GoogleWorkspacePage() {
         <div className="eyebrow">Google Workspace</div>
         <h1 className="h1">Your Google Study Workspace</h1>
         <p className="muted">
-          Plan study sessions for <b>Google Calendar</b>, keep your to-do list in <b>Google Tasks</b>, meet your study
-          circle on <b>Google Meet</b>, and keep notes in <b>Google Docs</b>. Punca keeps a copy here and opens each
-          Google app in a new tab, in whichever Google account you are signed in to.
+          Plan study sessions for <b>Google Calendar</b>, keep a study to-do list, meet your study circle on{' '}
+          <b>Google Meet</b>, and keep notes in <b>Google Docs</b>. Punca keeps a copy here and opens each Google app
+          in a new tab, in whichever Google account you are signed in to.
         </p>
         <div className="pp-tabs" style={{ marginTop: '1rem' }}>
           <button className={tab === 'calendar' ? 'on' : ''} onClick={() => setTab('calendar')}>
             Google Calendar ({(data.calendarEvents || []).length})
           </button>
           <button className={tab === 'tasks' ? 'on' : ''} onClick={() => setTab('tasks')}>
-            Google Tasks
+            Study tasks ({(data.tasks || []).filter((t) => !t.completed).length} open)
           </button>
           <button className={tab === 'chat' ? 'on' : ''} onClick={() => setTab('chat')}>
             Chat and Google Meet ({(data.chatSpaces || []).length})
@@ -351,21 +377,87 @@ export default function GoogleWorkspacePage() {
         </div>
       )}
 
-      {/* ---- GOOGLE TASKS ---- */}
+      {/* ---- STUDY TASKS (kept in Punca) ---- */}
       {tab === 'tasks' && (
-        <div className="card">
-          <div className="eyebrow">Google Tasks · Study to-do list</div>
-          <h2 className="h2">Keep your study to-do list in Google Tasks</h2>
-          <p className="muted">
-            Open Google Tasks and add the steps you want to remember there, for example each stop on the rebuild
-            route from your latest diagnosis, and the re-check that earns your stamp. Tasks with a date also show up
-            in Google Calendar.
-          </p>
-          <div className="actions left">
-            <a className="btn primary" href={GOOGLE_TASKS_URL} target="_blank" rel="noreferrer">
-              Open Google Tasks ↗
-            </a>
+        <div className="grid2 top">
+          <div className="card">
+            <div className="ws-section-head">
+              <div>
+                <div className="eyebrow">Study to-do list · kept in Punca</div>
+                <h2 className="h2">My study tasks</h2>
+              </div>
+              <a className="btn ghost small" href={GOOGLE_TASKS_URL} target="_blank" rel="noreferrer">
+                Open Google Tasks ↗
+              </a>
+            </div>
+            <p className="fine">
+              These tasks are saved in Punca, not in Google Tasks. To keep one in Google Tasks too, open Google Tasks
+              and add it there.
+            </p>
+            {(data.tasks || []).length === 0 ? (
+              <p className="muted">No tasks yet. Add one on the right, or add the rebuild route from a diagnosis result.</p>
+            ) : (
+              <div className="ws-list">
+                {data.tasks.map((t) => (
+                  <div key={t.id} className={`ws-item task-row ${t.completed ? 'task-done' : ''}`}>
+                    <label className="task-check-label">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(t.completed)}
+                        onChange={() => toggleTask(t)}
+                      />
+                      <div>
+                        <b className={t.completed ? 'strike' : ''}>{t.title}</b>
+                        {t.notes && <div className="fine">{t.notes}</div>}
+                        {t.due && <div className="fine">Due: {t.due}</div>}
+                      </div>
+                    </label>
+                    <button
+                      type="button"
+                      className="btn ghost small"
+                      disabled={busy}
+                      onClick={() => act(() => api(`/google/tasks/${t.id}`, { method: 'DELETE' }))}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
+
+          <form className="card" onSubmit={createTask}>
+            <div className="eyebrow">Add a to-do item</div>
+            <h2 className="h2">New task</h2>
+            <label className="field">Task title
+              <input
+                value={taskTitle}
+                onChange={(e) => setTaskTitle(e.target.value)}
+                placeholder="e.g. Complete re-check for Chain Rule"
+                required
+              />
+            </label>
+            <label className="field">Due date <small>(optional)</small>
+              <input
+                type="date"
+                value={taskDue}
+                onChange={(e) => setTaskDue(e.target.value)}
+              />
+            </label>
+            <label className="field">Notes <small>(optional)</small>
+              <textarea
+                rows={3}
+                value={taskNotes}
+                onChange={(e) => setTaskNotes(e.target.value)}
+                placeholder="Key steps or lab exercises to finish..."
+              />
+            </label>
+            <div className="actions">
+              <button className="btn primary" disabled={busy || !taskTitle.trim()}>
+                Add task
+              </button>
+            </div>
+          </form>
         </div>
       )}
 
@@ -599,6 +691,11 @@ export default function GoogleWorkspacePage() {
               checked={enabled.calendar !== false}
               label="Google Calendar (Peer group & study session scheduling)"
               onChange={(v) => toggleService('calendar', v)}
+            />
+            <Toggle
+              checked={enabled.tasks !== false}
+              label="Study tasks (to-do list and rebuild-route steps, kept in Punca)"
+              onChange={(v) => toggleService('tasks', v)}
             />
             <Toggle
               checked={enabled.chat !== false}

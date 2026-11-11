@@ -168,6 +168,22 @@ export default function ResultPage({ id, catalog, user, onUser }) {
     }
   }
 
+  // Adds each step of the rebuild route to the study task list kept in Punca.
+  const addRouteToTasks = async () => {
+    setWsBusy(true)
+    setWsNotice(null)
+    try {
+      const res = await api(`/google/tasks/from-diagnosis/${id}`, { method: 'POST' })
+      setWsNotice({
+        text: `Added ${res.created.length} step(s) to your study tasks in Punca (Google Workspace → Study tasks).`,
+      })
+    } catch (e) {
+      setWsNotice({ text: `Could not add the tasks: ${e.message}` })
+    } finally {
+      setWsBusy(false)
+    }
+  }
+
   return (
     <div className="result">
       <div className="card hero-card">
@@ -319,6 +335,9 @@ export default function ResultPage({ id, catalog, user, onUser }) {
                 <div className="actions left" style={{ marginTop: '1rem' }}>
                   <button type="button" className="btn small" disabled={wsBusy} onClick={saveToGoogleDocs}>
                     Save notes to Google Docs
+                  </button>
+                  <button type="button" className="btn ghost small" disabled={wsBusy} onClick={addRouteToTasks}>
+                    Add route to my study tasks
                   </button>
                   <a className="btn ghost small" href={GOOGLE_TASKS_URL} target="_blank" rel="noreferrer">
                     Open Google Tasks ↗

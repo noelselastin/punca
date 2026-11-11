@@ -7,7 +7,6 @@ import { ErrorNote, Spinner, Toggle, go, useAsync } from '../components/common.j
 /** One suggested study partner: what you have in common, how to reach them, and a circle to join. */
 function PeerCard({ peer, busy, onJoin }) {
   const common = peer.commonGaps.length > 0
-  const first = peer.name.split(' ')[0]
   return (
     <li className="peer-card">
       <div className="peer-head">
@@ -18,7 +17,7 @@ function PeerCard({ peer, busy, onJoin }) {
           </div>
         </div>
         {peer.email ? (
-          <a className="peer-email" href={`mailto:${peer.email}`}>{peer.email}</a>
+          <span className="peer-email">{peer.email}</span>
         ) : (
           <span className="fine">Email not shared</span>
         )}
@@ -52,11 +51,6 @@ function PeerCard({ peer, busy, onJoin }) {
             Study {peer.commonGaps[0].name} together
           </button>
         ) : null}
-        {peer.email && (
-          <a className="btn ghost small" href={`mailto:${peer.email}?subject=${encodeURIComponent('Study together on Punca')}`}>
-            Email {first}
-          </a>
-        )}
       </div>
     </li>
   )

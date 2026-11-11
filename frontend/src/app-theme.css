@@ -1001,6 +1001,7 @@ a.who small {
   font-size: 13px;
   font-weight: 600;
   overflow-wrap: anywhere;
+  user-select: all; /* one click selects the whole address to copy */
 }
 .peer-facts {
   margin: 10px 0 0;

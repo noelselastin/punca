@@ -16,7 +16,7 @@ export function MemberList({ members }) {
           </div>
           {!m.isYou && (
             <div className="fine">
-              {m.email ? <a href={`mailto:${m.email}`}>{m.email}</a> : 'Contact through the circle chat'}
+              {m.email || 'Contact through the circle chat'}
               {m.sharedHours && m.sharedHours.length > 0 && (
                 <span className="shared-hour"> · Free when you are: {m.sharedHours.join(', ')}</span>
               )}
