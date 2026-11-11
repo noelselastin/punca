@@ -55,7 +55,22 @@ Why current support doesn't fix it:
 
 **The bottleneck:** nobody connects *"I'm stuck on this lab"* to *"you're missing this earlier concept, and here is the fastest way to fix it."*
 
-> *Validation (complete before the pitch):* a short survey of APU STEM students. Suggested questions: "What was the last concept you realised you never properly understood?" and "How long did it take you to notice?" Insert real results here. Until then, no figures are claimed.
+### What APU students told us
+
+In November 2026, 22 APU STEM students (Years 1 to 3) answered our Google Form, the *APU Student Learning Experience Survey*.
+
+| Finding | Share |
+|---|---|
+| Have struggled with an advanced topic because they didn't fully understand an earlier concept | 82% (18 of 22) |
+| Take a few days or more to realise the difficulty comes from an earlier concept, or sometimes never find it | 59% (13 of 22) |
+| Rate their confidence in naming the concepts to revise at 3 or below out of 5 | 64% (14 of 22) |
+| Turn to ChatGPT or another AI tool first when stuck (several answers allowed) | 95% (21 of 22) |
+| Contact their lecturer first; attend consultation sessions | 9% (2 of 22); 0% |
+| Would find a platform like Punca useful | 91% (20 of 22) |
+
+> "Struggled with Advanced Fluid Mechanics due to weak foundations." (survey answer)
+
+It is a small, self-selected sample. It shows the problem exists on our campus, not how common it is. Full results and every free-text answer are in [docs/survey-results.md](docs/survey-results.md).
 
 ## 2. The Solution
 
@@ -188,7 +203,7 @@ This is a hack-day build. Nothing below is claimed as done until it is.
 | Stamp rules and endorsement | Members 1, 2 and 3 | Verified and endorsed tiers done. Mentor and faded stamps (Stretch) not started. |
 | Lecturer dashboard and heatmap | Member 3 | MVP done, on synthetic cohort data. |
 | Evaluation set and accuracy measurement | Member 1 | 25 simulated cases; offline and live Gemini results in section 15. |
-| Survey and pitch | Member 3 | Not started |
+| Survey and pitch | Member 3 | Survey done: 22 responses (section 1). Pitch video in progress. |
 
 ### What the MVP does differently from the plan
 
@@ -481,7 +496,7 @@ The landing page introduces the problem, links published evidence, and illustrat
 
 **Create my passport** keeps the existing journey: student sign-up, passport customisation, then the issued passport. Signed-in students return to their passport; staff return to the lecturer dashboard.
 
-See [the landing-page evidence notes](docs/landing-evidence.md) for the source context and claims excluded from the supplied research draft. Published statistics describe external research, not APU students or measured Punca outcomes.
+See [the landing-page evidence notes](docs/landing-evidence.md) for the source context and claims excluded from the supplied research draft. Published statistics describe external research, not APU students or measured Punca outcomes. The APU figures on the page come from the team's own survey ([docs/survey-results.md](docs/survey-results.md)).
 
 ## 16. Demo Script (about 3 minutes)
 
@@ -539,7 +554,7 @@ On first start the backend seeds synthetic demo data into `backend/var/store.jso
 **Accounts**
 
 - Visitors land on the public page. **Create my passport** leads to a student sign-up, then to passport customisation.
-- The research figures on the landing page come from published sources, listed and linked at the bottom of that page. They are not APU data; the APU survey (section 1) is still to do.
+- The research figures on the landing page come from published sources, listed and linked at the bottom of that page. They are not APU data. The APU survey results (section 1) appear below them, under "We asked 22 APU STEM students".
 - The sign-in page also has two demo buttons: **Try the demo student** and **Lecturer view (demo staff)**. Their logins are defined in `backend/store/seed.py` and exist only in the local demo store.
 - There is no lecturer sign-up. Lecturer accounts would come from the university later.
 

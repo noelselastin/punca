@@ -31,7 +31,7 @@ Deadlines (from the hackathon Discord, check #announcements for changes):
 - [x] Student UI: diagnose flow, result, remediation, practice, re-check, circles, history
 - [x] Passport pages and map view, opt-in sharing
 - [x] Lecturer dashboard: demand, heatmap, slot manager, confirm/decline, countersign, shared passports
-- [ ] Run the student survey (README section 1) and put real results in the README
+- [x] Run the student survey (README section 1) and put real results in the README: 22 responses, November 2026 ([docs/survey-results.md](docs/survey-results.md))
 - [ ] Pitch deck as PDF (10 MB or less) and a 3-minute demo run-through (README section 16)
 - [ ] Optional demo link (screen recording or hosted build)
 

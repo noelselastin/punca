@@ -88,6 +88,16 @@
 .pn-source { display: inline-flex; color: var(--pn-ink); align-items: center; gap: 15px; text-underline-offset: 4px; font-size: 10px; font-weight: 600; margin-top: 22px; }
 .pn-source svg { width: 14px; height: 14px; }
 .pn-research-note { margin-top: 31px; border-left: 2px solid #b78847; padding-left: 15px; font-size: 10px; color: var(--pn-muted); line-height: 1.8; }
+.pn-survey { margin-top: 52px; padding-top: 31px; border-top: 1px solid var(--pn-line); display: grid; grid-template-columns: 1fr 2.6fr; gap: 26px 48px; }
+.pn-survey-head .pn-eyebrow { margin-bottom: 14px; color: #8a5a22; }
+.pn-survey-head p { font-size: 12px; line-height: 1.8; color: var(--pn-muted); }
+.pn-survey-stats { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); }
+.pn-survey-stats li { display: flex; flex-direction: column; gap: 9px; padding: 0 20px; border-left: 1px solid var(--pn-line); }
+.pn-survey-stats b { font-size: clamp(34px, 3.1vw, 46px); font-weight: 500; letter-spacing: -.06em; line-height: 1.05; }
+.pn-survey-stats span { font-size: 13px; line-height: 1.6; }
+.pn-survey-stats small { margin-top: auto; font-size: 10px; line-height: 1.6; color: var(--pn-muted); }
+.pn-survey-quote { grid-column: 2; margin: 6px 0 0 20px; padding-left: 16px; border-left: 2px solid #b78847; font: italic 20px/1.45 Georgia, serif; letter-spacing: -.02em; }
+.pn-survey-quote cite { display: block; margin-top: 7px; font: 600 10px/1.6 'Segoe UI', Arial, sans-serif; letter-spacing: .04em; color: var(--pn-muted); font-style: normal; }
 .pn-journey-section { padding-block: 72px 36px; background: #e9ede8; border-top: 1px solid #d3d8cf; border-bottom: 1px solid #d3d8cf; }
 .pn-journey-section .pn-section-intro { margin-bottom: 35px; }
 .pn-flight { background: var(--pn-ink); border: 1px solid #17374c; border-radius: 4px; overflow: hidden; }
@@ -195,6 +205,10 @@
   .pn-quote-section, .pn-faq-section { gap: 40px; }
   .pn-research-main { padding-right: 30px; }
   .pn-research-side { padding-left: 30px; }
+  .pn-survey { grid-template-columns: 1fr; gap: 24px; }
+  .pn-survey-head p { max-width: 560px; }
+  .pn-survey-stats li:first-child { padding-left: 0; border-left: 0; }
+  .pn-survey-quote { grid-column: 1; margin-left: 0; }
 }
 @media (max-width: 800px) {
   .pn-nav nav { display: none; }
@@ -223,6 +237,8 @@
   .pn-quote-section blockquote { font-size: 24px; }
   .pn-faq-list summary { font-size: 14px; gap: 15px; }
   .pn-faq-answer { padding-right: 0; font-size: 12px; }
+  .pn-survey-stats { grid-template-columns: 1fr 1fr; row-gap: 26px; }
+  .pn-survey-stats li:nth-child(3) { padding-left: 0; border-left: 0; }
 }
 @media (max-width: 600px) {
   .pn-container { width: calc(100% - 40px); }
@@ -258,6 +274,11 @@
   .pn-evidence-grid { grid-template-columns: 1fr; }
   .pn-research-main { padding: 26px 0 28px; }
   .pn-research-side { padding: 27px 0 0; border-left: 0; border-top: 1px solid var(--pn-line); }
+  .pn-survey { margin-top: 40px; padding-top: 27px; }
+  .pn-survey-stats li { padding: 0 14px; }
+  .pn-survey-stats b { font-size: 38px; }
+  .pn-survey-stats span { font-size: 12px; }
+  .pn-survey-quote { font-size: 18px; }
   .pn-stat-line { font-size: 57px; margin-bottom: 18px; }
   .pn-class-size { font-size: 43px; }
   .pn-evidence h3 { font-size: 18px; }

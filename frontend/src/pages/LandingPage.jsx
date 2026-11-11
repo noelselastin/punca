@@ -9,6 +9,15 @@ const SOURCES = {
   ai: 'https://easychair.org/publications/preprint/4C1J',
 }
 
+// APU Student Learning Experience Survey (Google Form), 22 responses from APU STEM students,
+// November 2026. Full results and every free-text answer: docs/survey-results.md
+const SURVEY = [
+  ['82%', 'have struggled with an advanced topic because of a concept taught earlier.', '18 of 22 · 32% often, 50% sometimes'],
+  ['59%', 'take a few days or more to trace it back to the earlier concept, or never do.', '13 of 22 · 14% sometimes never find it'],
+  ['95%', 'turn to ChatGPT or another AI tool when stuck. Only 9% contact their lecturer.', '21 of 22 · none go to consultations'],
+  ['91%', 'would find a platform that pinpoints their missing foundations useful.', '20 of 22 · the other 2 were not sure'],
+]
+
 function Arrow({ diagonal = false }) {
   return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d={diagonal ? 'M6 18 18 6M6 6h12v12' : 'M4 12h16m-6-6 6 6-6 6'} stroke="currentColor" strokeWidth="1.6" /></svg>
 }
@@ -217,6 +226,17 @@ export default function LandingPage({ user, onStart, onSignIn }) {
         <div className="pn-evidence-grid">
           <article className="pn-research-main"><div className="pn-stat-line"><span>48%</span><span className="pn-stat-arrow">↘</span><span>33%</span></div><h3>Foundations can shape the whole degree.</h3><p>A study of nearly 110,000 records across six US public research universities linked lower introductory STEM grades to lower chances of completing a STEM degree.</p><p className="pn-study-context">The figures show one modelled comparison: STEM-intending white men with average preparation, with C-or-better grades in every introductory course versus below C in at least one. Association, not proof of cause.</p><a className="pn-source" href={SOURCES.stem} target="_blank" rel="noreferrer">Hatfield, Brown &amp; Topaz · PNAS Nexus, 2022 <Arrow diagonal /></a></article>
           <article className="pn-research-side"><div className="pn-stat-line pn-class-size">1,000–2,000</div><h3>Students in a single class.</h3><p>UNSW teaching guidance describes classes of this size as increasingly common, and identifies individual feedback as a challenge.</p><a className="pn-source" href={SOURCES.classes} target="_blank" rel="noreferrer">UNSW · Assessing Large Classes <Arrow diagonal /></a><div className="pn-research-note">Published research and teaching guidance.<br />These are not APU statistics or measured Punca outcomes.</div></article>
+        </div>
+        <div className="pn-survey" aria-labelledby="pn-survey-title">
+          <div className="pn-survey-head">
+            <p className="pn-eyebrow">CLOSER TO HOME · APU SURVEY</p>
+            <h3 id="pn-survey-title">We asked 22 APU STEM students.</h3>
+            <p>Years 1 to 3, November 2026, through a short Google Form. A small, self-selected sample: a signal from our own campus, not a census.</p>
+          </div>
+          <ul className="pn-survey-stats">
+            {SURVEY.map(([value, finding, detail]) => <li key={value}><b>{value}</b><span>{finding}</span><small>{detail}</small></li>)}
+          </ul>
+          <blockquote className="pn-survey-quote">“Struggled with Advanced Fluid Mechanics due to weak foundations.”<cite>An APU student, in the survey</cite></blockquote>
         </div>
       </section>
 
