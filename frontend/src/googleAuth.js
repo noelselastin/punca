@@ -1,4 +1,7 @@
-// Browser helper for Google Identity Services OAuth token flow.
+// Google sign-in in the browser (Google Identity Services token flow), for Calendar and Docs.
+// The server supplies the OAuth client ID; without one, live Google features stay off.
+import { api } from './api.js'
+
 let gsiPromise = null
 
 function loadGsiScript() {
@@ -13,11 +16,11 @@ function loadGsiScript() {
     script.defer = true
     script.onload = () => {
       if (window.google?.accounts?.oauth2) resolve(window.google.accounts.oauth2)
-      else reject(new Error('Google Identity Services failed to initialize.'))
+      else reject(new Error('Google sign-in did not load. Refresh the page and try again.'))
     }
     script.onerror = () => {
       gsiPromise = null
-      reject(new Error('Could not load Google Sign-In script. Check your internet connection.'))
+      reject(new Error('Could not load Google sign-in. Check your internet connection.'))
     }
     document.head.appendChild(script)
   })
@@ -26,7 +29,7 @@ function loadGsiScript() {
 
 export async function requestGoogleAccessToken({ clientId, scopes = [], loginHint = '' }) {
   if (!clientId) {
-    throw new Error('GOOGLE_OAUTH_CLIENT_ID is not configured on the server.')
+    throw new Error('Google sign-in is not set up on this Punca server yet.')
   }
   const oauth2 = await loadGsiScript()
   return new Promise((resolve, reject) => {
@@ -49,9 +52,26 @@ export async function requestGoogleAccessToken({ clientId, scopes = [], loginHin
         })
       },
       error_callback: (err) => {
-        reject(new Error(err?.message || 'Google sign-in popup was closed or blocked.'))
+        reject(new Error(err?.message || 'The Google sign-in window was closed or blocked.'))
       },
     })
-    tokenClient.requestAccessToken({ prompt: 'consent' })
+    // '' asks for consent only the first time; later connections are one click.
+    tokenClient.requestAccessToken({ prompt: '' })
   })
 }
+
+/**
+ * Connect the student's Google account (the personal Gmail from sign-up is pre-selected) and
+ * return Punca's updated workspace status. `ws` is the object from GET /api/google/status.
+ */
+export async function connectGoogle(ws) {
+  const token = await requestGoogleAccessToken({
+    clientId: ws?.oauthClientId,
+    scopes: ws?.oauthScopes || [],
+    loginHint: ws?.accountEmail || ws?.email || '',
+  })
+  return api('/google/connect', { method: 'POST', body: token })
+}
+
+export const GOOGLE_NOT_SET_UP =
+  'Google sign-in is not set up on this Punca server yet, so Punca cannot reach your Google account directly.'

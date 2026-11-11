@@ -45,6 +45,10 @@ class LoginBody(BaseModel):
 
 
 class ProfileBody(BaseModel):
+    name: str | None = None
+    email: str | None = None
+    university: str | None = None
+    studentId: str | None = None
     availability: list[str] | None = None
     consent: dict | None = None
     passport: dict | None = None
@@ -57,8 +61,6 @@ class MapBody(BaseModel):
     fileName: str | None = None
     fileBase64: str | None = None
     fileText: str | None = None
-    driveFileId: str | None = None
-    saveToDrive: bool = False
 
 
 class StartBody(BaseModel):
@@ -104,14 +106,6 @@ class GoogleConfigBody(BaseModel):
     expiresIn: int | None = None
     enabledServices: dict | None = None
     preferences: dict | None = None
-
-
-class DriveUploadBody(BaseModel):
-    fileName: str | None = None
-    fileBase64: str | None = None
-    fileText: str | None = None
-    mimeType: str | None = None
-    folder: str | None = None
 
 
 class CalendarEventBody(BaseModel):
@@ -167,10 +161,11 @@ def create_app(store_path: Path | None = None, offline: bool | None = None) -> F
     if store.empty:
         log.info("store is empty: seeding synthetic demo data")
         seed_store(store, catalog)
-    else:
-        ensure_demo_users(store, catalog)
     llm_client = LLMClient(offline=offline)
     svc = PuncaService(catalog, store, LLMService(catalog, llm_client))
+    # Demo accounts are built through the service so their diagnoses, stamps and circles are real
+    # records. Runs on every start and only rebuilds a demo account when its data version changed.
+    ensure_demo_users(svc)
 
     app = FastAPI(title="Punca API", version="0.2.0")
     app.state.svc = svc
@@ -320,6 +315,14 @@ def create_app(store_path: Path | None = None, offline: bool | None = None) -> F
     def circle_suggestion(conceptId: str | None = None, user: dict = Depends(student)):
         return svc.circle_suggestion(user, conceptId)
 
+    @app.get("/api/circles/peers")
+    def circle_peers(user: dict = Depends(student)):
+        return svc.peer_suggestions(user)
+
+    @app.post("/api/circles/{circle_id}/join")
+    def join_circle_by_id(circle_id: str, user: dict = Depends(student)):
+        return svc.join_circle_by_id(user, circle_id)
+
     @app.post("/api/circles/join")
     def join_circle(body: ConceptBody, user: dict = Depends(student)):
         return svc.join_circle(user, body.conceptId)
@@ -361,17 +364,13 @@ def create_app(store_path: Path | None = None, offline: bool | None = None) -> F
     def google_configure(body: GoogleConfigBody, user: dict = Depends(student)):
         return svc.google_configure(user, body.model_dump(exclude_none=True))
 
-    @app.post("/api/google/drive/upload")
-    def google_drive_upload(body: DriveUploadBody, user: dict = Depends(student)):
-        return svc.google_drive_upload(user, body.model_dump())
-
-    @app.delete("/api/google/drive/{file_id}")
-    def google_drive_delete(file_id: str, user: dict = Depends(student)):
-        return svc.google_drive_delete(user, file_id)
-
     @app.post("/api/google/calendar/events")
     def google_calendar_create(body: CalendarEventBody, user: dict = Depends(student)):
         return svc.google_calendar_create(user, body.model_dump())
+
+    @app.post("/api/google/calendar/events/{event_id}/sync")
+    def google_calendar_sync(event_id: str, user: dict = Depends(student)):
+        return svc.google_calendar_sync(user, event_id)
 
     @app.delete("/api/google/calendar/events/{event_id}")
     def google_calendar_delete(event_id: str, user: dict = Depends(student)):

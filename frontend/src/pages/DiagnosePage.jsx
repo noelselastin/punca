@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from 'react'
 import { api } from '../api.js'
 import { ErrorNote, StateChip, go } from '../components/common.jsx'
 import ProbeCard from '../components/ProbeCard.jsx'
-import { requestGoogleAccessToken } from '../googleAuth.js'
 
 const EXAMPLES = [
   'Minimising f(x, y) = (x - 3)^2 + (2y + 1)^2 with gradient descent and partial derivatives',
@@ -21,18 +20,10 @@ function readFileAsBase64(file) {
   })
 }
 
-export default function DiagnosePage({ prefill, onClearPrefill }) {
+export default function DiagnosePage() {
   const [stage, setStage] = useState('input')
-  const [text, setText] = useState(prefill ? prefill.stuckInput || '' : '')
+  const [text, setText] = useState('')
   const [pcFile, setPcFile] = useState(null) // { fileName, fileBase64, sizeBytes, mimeType }
-  const [saveToDrive, setSaveToDrive] = useState(true)
-  const [driveFile, setDriveFile] = useState(null) // { id, name, summary, webViewLink, live }
-  const [showDrivePicker, setShowDrivePicker] = useState(false)
-  const [driveFiles, setDriveFiles] = useState([])
-  const [driveLoading, setDriveLoading] = useState(false)
-  const [driveUploading, setDriveUploading] = useState(false)
-  const [driveNotice, setDriveNotice] = useState('')
-  const [wsStatus, setWsStatus] = useState(null)
 
   const [mapping, setMapping] = useState(null)
   const [target, setTarget] = useState(null)
@@ -44,34 +35,6 @@ export default function DiagnosePage({ prefill, onClearPrefill }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
   const fileInputRef = useRef(null)
-  const directDriveInputRef = useRef(null)
-
-  const loadWorkspaceStatus = async () => {
-    try {
-      const ws = await api('/google/status')
-      setWsStatus(ws)
-      setDriveFiles(ws.driveFiles || [])
-      return ws
-    } catch {
-      return null
-    }
-  }
-
-  useEffect(() => {
-    loadWorkspaceStatus()
-  }, [])
-
-  useEffect(() => {
-    if (prefill) {
-      if (prefill.stuckInput) setText(prefill.stuckInput)
-      if (prefill.driveFile) {
-        setDriveFile(prefill.driveFile)
-        setPcFile(null)
-      }
-      setStage('input')
-      if (onClearPrefill) onClearPrefill()
-    }
-  }, [prefill, onClearPrefill])
 
   const run = async (fn) => {
     setBusy(true)
@@ -89,7 +52,6 @@ export default function DiagnosePage({ prefill, onClearPrefill }) {
     const file = e.target.files && e.target.files[0]
     if (!file) return
     setError(null)
-    setDriveNotice('')
     try {
       const b64 = await readFileAsBase64(file)
       setPcFile({
@@ -98,8 +60,6 @@ export default function DiagnosePage({ prefill, onClearPrefill }) {
         sizeBytes: file.size,
         mimeType: file.type || undefined,
       })
-      setDriveFile(null)
-      setShowDrivePicker(false)
       if (stage !== 'input') setStage('input')
     } catch (err) {
       setError(err)
@@ -108,138 +68,23 @@ export default function DiagnosePage({ prefill, onClearPrefill }) {
     }
   }
 
-  const uploadFileDirectlyToDrive = async (fileObj) => {
-    setDriveUploading(true)
-    setError(null)
-    setDriveNotice('')
-    try {
-      const res = await api('/google/drive/upload', {
-        method: 'POST',
-        body: {
-          fileName: fileObj.fileName,
-          fileBase64: fileObj.fileBase64,
-          mimeType: fileObj.mimeType,
-        },
-      })
-      const saved = res.file
-      if (res.workspace) {
-        setWsStatus(res.workspace)
-        setDriveFiles(res.workspace.driveFiles || [])
-      }
-      setDriveFile(saved)
-      setPcFile(null)
-      setShowDrivePicker(false)
-      setDriveNotice(
-        res.warning
-          ? `Saved '${saved.name}' to your Punca Drive folder (${res.warning})`
-          : saved.live
-            ? `Uploaded '${saved.name}' directly to your Google Drive (${saved.folder}) and attached it below.`
-            : `Uploaded '${saved.name}' to your Google Drive study folder (${saved.folder}) and attached it below.`
-      )
-      if (!text.trim() && saved.summary) {
-        setText(`Struggling with ${saved.name}: ${saved.summary}`.slice(0, 400))
-      }
-      if (stage !== 'input') setStage('input')
-    } catch (err) {
-      setError(err)
-    } finally {
-      setDriveUploading(false)
-    }
-  }
-
-  const handleDirectDriveInput = async (e) => {
-    const file = e.target.files && e.target.files[0]
-    if (!file) return
-    try {
-      const b64 = await readFileAsBase64(file)
-      await uploadFileDirectlyToDrive({
-        fileName: file.name,
-        fileBase64: b64,
-        sizeBytes: file.size,
-        mimeType: file.type || undefined,
-      })
-    } catch (err) {
-      setError(err)
-    } finally {
-      if (directDriveInputRef.current) directDriveInputRef.current.value = ''
-    }
-  }
-
-  const connectLiveGoogle = async () => {
-    if (!wsStatus?.oauthClientId) {
-      go('workspace')
-      return
-    }
-    setDriveUploading(true)
-    setError(null)
-    try {
-      const tok = await requestGoogleAccessToken({
-        clientId: wsStatus.oauthClientId,
-        scopes: wsStatus.oauthScopes || [],
-        loginHint: wsStatus.accountEmail || wsStatus.email || '',
-      })
-      const updated = await api('/google/connect', { method: 'POST', body: tok })
-      setWsStatus(updated)
-      setDriveFiles(updated.driveFiles || [])
-      setDriveNotice(`Connected live Google Drive for ${updated.email}.`)
-    } catch (err) {
-      setError(err)
-    } finally {
-      setDriveUploading(false)
-    }
-  }
-
-  const openDrivePicker = async () => {
-    if (showDrivePicker) {
-      setShowDrivePicker(false)
-      return
-    }
-    setShowDrivePicker(true)
-    setDriveLoading(true)
-    setError(null)
-    try {
-      const ws = await api('/google/status')
-      setWsStatus(ws)
-      setDriveFiles(ws.driveFiles || [])
-    } catch (err) {
-      setError(err)
-    } finally {
-      setDriveLoading(false)
-    }
-  }
-
-  const selectDriveFile = (f) => {
-    setDriveFile(f)
-    setPcFile(null)
-    setShowDrivePicker(false)
-    setDriveNotice(`Attached '${f.name}' from Google Drive.`)
-    if (!text.trim()) {
-      setText(`Struggling with ${f.name}: ${f.summary || ''}`.slice(0, 400))
-    }
-    if (stage !== 'input') setStage('input')
-  }
-
-  const canSubmit = text.trim().length >= 3 || pcFile != null || driveFile != null
+  const canSubmit = text.trim().length >= 3 || pcFile != null
 
   const findGap = (e) => {
     e.preventDefault()
     run(async () => {
       const body = {
-        stuckInput: text.trim() || (pcFile ? `Lab file: ${pcFile.fileName}` : driveFile ? `Drive file: ${driveFile.name}` : ''),
+        stuckInput: text.trim() || (pcFile ? `Lab file: ${pcFile.fileName}` : ''),
       }
       if (pcFile) {
         body.fileName = pcFile.fileName
         body.fileBase64 = pcFile.fileBase64
         body.mimeType = pcFile.mimeType
-        body.saveToDrive = saveToDrive
-      } else if (driveFile) {
-        body.driveFileId = driveFile.id
       }
       const m = await api('/map', { method: 'POST', body })
       setMapping(m)
       setTarget(m.targetConceptId)
       setStage('mapped')
-      loadWorkspaceStatus()
     })
   }
 
@@ -349,7 +194,7 @@ export default function DiagnosePage({ prefill, onClearPrefill }) {
       <form className="card" onSubmit={findGap}>
         <h1 className="h1">Where are you stuck?</h1>
         <p className="muted">
-          Write your question or lab brief below, or upload the lab/question file directly to Google Drive or from your PC so Punca can read the document and assess every required foundation.
+          Write your question or lab brief below, or upload the lab or question file from your PC so Punca can read it and assess every required foundation.
         </p>
         <textarea
           value={text}
@@ -364,179 +209,36 @@ export default function DiagnosePage({ prefill, onClearPrefill }) {
 
         <div className="doc-upload-bar">
           <input
-            ref={directDriveInputRef}
-            type="file"
-            accept=".txt,.md,.py,.java,.c,.cpp,.js,.jsx,.ts,.sql,.csv,.json,.ipynb,.docx,.pptx,.pdf"
-            onChange={handleDirectDriveInput}
-            style={{ display: 'none' }}
-          />
-          <input
             ref={fileInputRef}
             type="file"
             accept=".txt,.md,.py,.java,.c,.cpp,.js,.jsx,.ts,.sql,.csv,.json,.ipynb,.docx,.pptx,.pdf"
             onChange={handlePcFileSelect}
             style={{ display: 'none' }}
           />
-
-          <div className="drive-conn-strip">
-            <div className="drive-conn-info">
-              <span className={`ws-dot ${wsStatus?.connected !== false ? 'on' : 'off'}`} />
-              <span>
-                <b>Google Drive:</b>{' '}
-                {wsStatus
-                  ? wsStatus.connected === false
-                    ? 'Switched off in Workspace settings'
-                    : `${wsStatus.email} · Folder: ${wsStatus.preferences?.driveFolderName || 'Punca Study Materials'} (${(wsStatus.driveFiles || []).length} files)`
-                  : 'Connected'}
-              </span>
-              {wsStatus?.liveConnected && <span className="chip solid">Live Google Drive</span>}
-            </div>
-            <div className="drive-conn-actions">
-              {wsStatus?.liveAvailable && !wsStatus?.liveConnected && (
-                <button
-                  type="button"
-                  className="btn ghost small"
-                  disabled={driveUploading}
-                  onClick={connectLiveGoogle}
-                >
-                  Connect live Google account
-                </button>
-              )}
-              <button type="button" className="linkish fine" onClick={() => go('workspace')}>
-                Open Drive in Workspace →
-              </button>
-            </div>
-          </div>
-
           <div className="doc-upload-buttons">
             <button
               type="button"
               className="btn small"
-              disabled={driveUploading}
-              onClick={() => directDriveInputRef.current && directDriveInputRef.current.click()}
-            >
-              {driveUploading ? 'Uploading to Google Drive...' : '☁️ Upload directly to Google Drive'}
-            </button>
-            <button
-              type="button"
-              className="btn ghost small"
-              onClick={openDrivePicker}
-            >
-              {showDrivePicker ? 'Hide Google Drive files' : `📂 Pick from Google Drive (${driveFiles.length})`}
-            </button>
-            <button
-              type="button"
-              className="btn ghost small"
               onClick={() => fileInputRef.current && fileInputRef.current.click()}
             >
-              💻 Attach file from PC
+              Upload from PC
             </button>
           </div>
-          <span className="fine">Supports .pdf, .docx, .pptx, .ipynb, .py, .java, .sql, .md, .txt, .csv</span>
+          <span className="fine">
+            Reads .pdf, .docx, .pptx, .ipynb, .py, .java, .sql, .md, .txt and .csv files.
+          </span>
         </div>
-
-        {driveNotice && (
-          <div className="ws-banner" style={{ marginBottom: '0.75rem' }}>
-            <span>{driveNotice}</span>
-            <button type="button" className="linkish" onClick={() => setDriveNotice('')}>Dismiss</button>
-          </div>
-        )}
 
         {pcFile && (
           <div className="attached-file-card">
             <div>
-              <div className="eyebrow">Attached from PC</div>
+              <div className="eyebrow">Uploaded from PC</div>
               <b>{pcFile.fileName}</b>{' '}
               <span className="fine">({Math.max(1, Math.round(pcFile.sizeBytes / 1024))} KB)</span>
-              <label className="inline-check">
-                <input
-                  type="checkbox"
-                  checked={saveToDrive}
-                  onChange={(e) => setSaveToDrive(e.target.checked)}
-                />
-                <span>Also save to my Google Drive study folder when assessing</span>
-              </label>
             </div>
-            <div className="row" style={{ gap: '0.4rem' }}>
-              <button
-                type="button"
-                className="btn small"
-                disabled={driveUploading}
-                onClick={() => uploadFileDirectlyToDrive(pcFile)}
-              >
-                {driveUploading ? 'Uploading...' : '☁️ Upload to Drive now'}
-              </button>
-              <button type="button" className="btn ghost small" onClick={() => setPcFile(null)}>
-                Remove
-              </button>
-            </div>
-          </div>
-        )}
-
-        {driveFile && (
-          <div className="attached-file-card">
-            <div>
-              <div className="eyebrow">
-                Attached from Google Drive {driveFile.live ? '· Live Google Drive' : `· ${driveFile.folder || 'Study Folder'}`}
-              </div>
-              <b>{driveFile.name}</b>
-              {driveFile.summary && <p className="fine" style={{ margin: '0.25rem 0 0' }}>{driveFile.summary}</p>}
-              {driveFile.webViewLink && (
-                <a className="fine" href={driveFile.webViewLink} target="_blank" rel="noreferrer">
-                  Open in Google Drive ↗
-                </a>
-              )}
-            </div>
-            <button type="button" className="btn ghost small" onClick={() => setDriveFile(null)}>
+            <button type="button" className="btn ghost small" onClick={() => setPcFile(null)}>
               Remove
             </button>
-          </div>
-        )}
-
-        {showDrivePicker && (
-          <div className="drive-picker-panel">
-            <div className="drive-picker-head">
-              <b>Google Drive · Study & Lab Files ({driveFiles.length})</b>
-              <div className="row" style={{ gap: '0.6rem' }}>
-                <button
-                  type="button"
-                  className="btn small"
-                  disabled={driveUploading}
-                  onClick={() => directDriveInputRef.current && directDriveInputRef.current.click()}
-                >
-                  + Upload new file to Drive
-                </button>
-                <button type="button" className="linkish" onClick={() => go('workspace')}>
-                  Manage Google Drive →
-                </button>
-              </div>
-            </div>
-            {driveLoading ? (
-              <p className="fine">Loading your Google Drive files...</p>
-            ) : driveFiles.length === 0 ? (
-              <p className="fine">No files in your Google Drive yet. Click “Upload directly to Google Drive” above.</p>
-            ) : (
-              <div className="drive-file-list">
-                {driveFiles.map((df) => (
-                  <div key={df.id} className="drive-file-item">
-                    <div>
-                      <div className="row" style={{ gap: '0.4rem' }}>
-                        <b>{df.name}</b>
-                        {df.starter ? (
-                          <span className="chip untested">Course sample</span>
-                        ) : (
-                          <span className="chip solid">{df.live ? 'Live Drive' : 'Uploaded'}</span>
-                        )}
-                      </div>
-                      <div className="fine">{df.summary}</div>
-                    </div>
-                    <button type="button" className="btn small" onClick={() => selectDriveFile(df)}>
-                      Attach
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         )}
 
@@ -572,17 +274,10 @@ export default function DiagnosePage({ prefill, onClearPrefill }) {
           {mapping.documentSummary && (
             <div className="attached-file-card" style={{ marginBottom: '1rem' }}>
               <div>
-                <div className="eyebrow">
-                  Document read ({mapping.documentSummary.source === 'google-drive' ? 'Google Drive' : 'Uploaded to Google Drive'})
-                </div>
+                <div className="eyebrow">Document read (uploaded from PC)</div>
                 <b>{mapping.documentSummary.fileName}</b>{' '}
                 <span className="fine">({mapping.documentSummary.wordCount} words extracted)</span>
                 <p className="fine" style={{ marginTop: '0.25rem' }}>{mapping.documentSummary.summary}</p>
-                {mapping.documentSummary.webViewLink && (
-                  <a className="fine" href={mapping.documentSummary.webViewLink} target="_blank" rel="noreferrer">
-                    View in Google Drive ↗
-                  </a>
-                )}
               </div>
             </div>
           )}

@@ -1,9 +1,9 @@
 """Google Workspace integration & document text extraction for Punca.
 
 Provides:
-1. Document reader (`extract_document_text`) for PC uploads and Google Drive files
+1. Document reader (`extract_document_text`) for files uploaded from the student's PC
    (.pdf, .docx, .pptx, .ipynb, .py, .java, .sql, .md, .txt, .csv, .json).
-2. The per-user Workspace state Punca keeps (`drive`, `calendar`, `tasks`, `chat`, `meet`, `docs`)
+2. The per-user Workspace state Punca keeps (`calendar`, `tasks`, `chat`, `meet`, `docs`)
    with per-user settings (`enabledServices`, `preferences`). Live calls to the student's own
    Google account are in google_live.py; links are stored here only when Google returned them.
 """
@@ -12,7 +12,6 @@ from __future__ import annotations
 import base64
 import io
 import json
-import mimetypes
 import re
 import xml.etree.ElementTree as ET
 import zipfile
@@ -27,7 +26,9 @@ class WorkspaceError(Exception):
         self.message = message
 
 
-SERVICES = ("drive", "calendar", "tasks", "chat", "meet", "docs")
+SERVICES = ("calendar", "tasks", "chat", "meet", "docs")
+# Folder in the student's Google Drive that Punca's Google Docs are saved into.
+DOCS_FOLDER = "Punca Study Materials"
 
 
 def _now() -> datetime:
@@ -106,20 +107,25 @@ def extract_document_text(
     filename: str | None = None,
     content_base64: str | None = None,
     text: str | None = None,
+    raw: bytes | None = None,
 ) -> dict:
-    """Extract readable text and a concise summary from an uploaded file or text payload."""
+    """Extract readable text and a concise summary from an uploaded file or text payload.
+
+    The content can come as plain text, as base64 (browser upload) or as raw bytes.
+    """
     fname = (filename or "document.txt").strip()
     lower = fname.lower()
     extracted = (text or "").strip()
 
-    if not extracted and content_base64:
-        b64 = content_base64.strip()
-        if "," in b64 and b64.split(",", 1)[0].startswith("data:"):
-            b64 = b64.split(",", 1)[1]
-        try:
-            raw = base64.b64decode(b64)
-        except Exception as exc:
-            raise WorkspaceError(400, "Could not decode the uploaded file.") from exc
+    if not extracted and (content_base64 or raw is not None):
+        if raw is None:
+            b64 = content_base64.strip()
+            if "," in b64 and b64.split(",", 1)[0].startswith("data:"):
+                b64 = b64.split(",", 1)[1]
+            try:
+                raw = base64.b64decode(b64)
+            except Exception as exc:
+                raise WorkspaceError(400, "Could not decode the uploaded file.") from exc
         if len(raw) > 8 * 1024 * 1024:
             raise WorkspaceError(400, "File is too large (maximum 8 MB).")
         try:
@@ -150,32 +156,6 @@ def extract_document_text(
         "summary": summary,
         "wordCount": len(words),
     }
-
-
-# ===================================================================== Upload helpers =========
-def decode_upload(content_base64: str | None) -> bytes | None:
-    """Raw bytes of an uploaded file (accepts plain base64 or a data: URL)."""
-    if not content_base64:
-        return None
-    b64 = content_base64.strip()
-    if "," in b64 and b64.split(",", 1)[0].startswith("data:"):
-        b64 = b64.split(",", 1)[1]
-    try:
-        return base64.b64decode(b64)
-    except Exception:
-        return None
-
-
-def guess_mime(filename: str, fallback: str = "text/plain") -> str:
-    extra = {
-        ".md": "text/markdown", ".py": "text/x-python", ".java": "text/x-java-source",
-        ".sql": "application/sql", ".ipynb": "application/x-ipynb+json",
-    }
-    lower = (filename or "").lower()
-    for ext, mime in extra.items():
-        if lower.endswith(ext):
-            return mime
-    return mimetypes.guess_type(filename or "")[0] or fallback
 
 
 # ===================================================================== Calendar + Meet ========
@@ -228,119 +208,6 @@ def calendar_template_link(title: str, description: str, start: str, end: str, t
 # ===================================================================== Seeded Workspace =======
 STARTER_VERSION = 3
 # Sample files from earlier builds that covered topics outside the six modules in the concept graph.
-RETIRED_STARTER_IDS = {
-    "gdrive-lab5-backprop", "gdrive-lab6-oop-recursion", "gdrive-lab7-dsa-graphs",
-    "gdrive-lab8-sql-acid", "gdrive-lab9-networks-os",
-}
-
-
-def _starter_drive_files(now_iso: str) -> list[dict]:
-    """Sample lab files, one or two per module in the concept graph, so a new account can try
-    "pick a file" straight away. They live in Punca only and are marked as samples."""
-    def sample(fid: str, name: str, mime: str, summary: str, content: str) -> dict:
-        return {
-            "id": fid,
-            "name": name,
-            "mimeType": mime,
-            "folder": "Punca Study Materials / Samples",
-            "sizeBytes": len(content.encode("utf-8")),
-            "updatedAt": now_iso,
-            "webViewLink": None,
-            "live": False,
-            "starter": True,
-            "summary": summary,
-            "content": content,
-        }
-
-    return [
-        sample(
-            "gdrive-sample-cm-graddesc",
-            "CM_Lab7_Gradient_Descent.md",
-            "text/markdown",
-            "Computational Mathematics lab: minimise a function with gradient descent using partial derivatives and the chain rule.",
-            "# Computational Mathematics Lab 7: Gradient Descent\n\n"
-            "## Objective\n"
-            "Minimise f(x, y) = (x - 3)^2 + (2y + 1)^2 with gradient descent.\n\n"
-            "## Tasks\n"
-            "1. Work out the partial derivatives df/dx and df/dy by hand.\n"
-            "2. The second term is a composite function, so apply the chain rule: d/dy (2y + 1)^2 = 2(2y + 1) * 2.\n"
-            "3. Implement the update step x = x - lr * df/dx, y = y - lr * df/dy and run 50 iterations.\n"
-            "4. Explain what happens when the learning rate is too large.\n\n"
-            "## Common stuck points\n"
-            "- Forgetting the inner derivative when differentiating a function of a function.\n"
-            "- Mixing up which variable is held constant in a partial derivative.",
-        ),
-        sample(
-            "gdrive-sample-cm-matmul",
-            "CM_Worksheet_Matrix_Multiplication.md",
-            "text/markdown",
-            "Computational Mathematics worksheet: matrix multiplication, dimension compatibility and vectors.",
-            "# Computational Mathematics Worksheet: Matrix Multiplication\n\n"
-            "1. A is a 2 x 3 matrix and B is a 3 x 4 matrix. State the shape of AB and explain why BA is undefined.\n"
-            "2. Multiply the matrices [[1, 2], [3, 4]] and [[0, 1], [1, 0]] row by column.\n"
-            "3. Show with an example that matrix multiplication is not commutative.\n"
-            "4. Write the dot product of two vectors as a 1 x n matrix times an n x 1 matrix.\n\n"
-            "Stuck point: I never know when the inner dimensions match, or which row goes with which column.",
-        ),
-        sample(
-            "gdrive-sample-py-recursion",
-            "PY_Lab4_Recursion.py",
-            "text/x-python",
-            "Introduction to Python lab: recursive functions, base cases and the call stack.",
-            "# Introduction to Python Lab 4: Recursion\n"
-            "def factorial(n):\n"
-            "    # Task 1: add the base case. Without it the function calls itself forever.\n"
-            "    return n * factorial(n - 1)\n\n"
-            "def count_down(n):\n"
-            "    # Task 2: trace the call stack for count_down(3) on paper.\n"
-            "    if n == 0:\n"
-            "        return\n"
-            "    print(n)\n"
-            "    count_down(n - 1)\n\n"
-            "# Task 3: write a recursive function that sums a nested list such as [1, [2, 3], [4, [5]]].\n"
-            "# Stuck point: I get RecursionError: maximum recursion depth exceeded and do not know why.",
-        ),
-        sample(
-            "gdrive-sample-java-polymorphism",
-            "JAVA_Lab5_Polymorphism_Shapes.java",
-            "text/x-java-source",
-            "Object Oriented Programming with Java lab: inheritance, method overriding and polymorphism.",
-            "// Object Oriented Programming with Java Lab 5: Polymorphism\n"
-            "abstract class Shape {\n"
-            "    abstract double area();\n"
-            "}\n\n"
-            "class Circle extends Shape {\n"
-            "    private final double r;\n"
-            "    Circle(double r) { this.r = r; }\n"
-            "    @Override double area() { return Math.PI * r * r; }\n"
-            "}\n\n"
-            "class Rectangle extends Shape {\n"
-            "    private final double w, h;\n"
-            "    Rectangle(double w, double h) { this.w = w; this.h = h; }\n"
-            "    @Override double area() { return w * h; }\n"
-            "}\n\n"
-            "// Task: store a Circle and a Rectangle in a Shape[] array and print each area.\n"
-            "// Explain which area() method runs for each element and why (dynamic dispatch).\n"
-            "// Stuck point: I do not understand how a Shape variable can call the Circle version of area().",
-        ),
-        sample(
-            "gdrive-sample-db-joins",
-            "DB_Lab4_SQL_Joins.sql",
-            "application/sql",
-            "Introduction to Databases lab: INNER JOIN and LEFT JOIN across students and enrolments, with GROUP BY.",
-            "-- Introduction to Databases Lab 4: SQL Joins\n"
-            "-- Task 1: List ALL students and how many modules each is enrolled in (0 for students with none).\n"
-            "SELECT s.student_id, s.name, COUNT(e.module_id) AS module_count\n"
-            "FROM students s\n"
-            "LEFT JOIN enrolments e ON s.student_id = e.student_id\n"
-            "GROUP BY s.student_id, s.name;\n\n"
-            "-- Task 2: Rewrite Task 1 with INNER JOIN and explain which students disappear and why.\n"
-            "-- Task 3: Join students, enrolments and modules to list each student's module titles.\n"
-            "-- Stuck point: my INNER JOIN drops students with no enrolments and I cannot see why.",
-        ),
-    ]
-
-
 def _migrate_workspace(ws: dict, now_iso: str) -> None:
     """Bring a workspace saved by an earlier build up to date.
 
@@ -350,14 +217,6 @@ def _migrate_workspace(ws: dict, now_iso: str) -> None:
     """
     if ws.get("starterVersion") == STARTER_VERSION:
         return
-    files = [f for f in ws.get("driveFiles") or [] if f.get("id") not in RETIRED_STARTER_IDS]
-    have = {f.get("id") for f in files}
-    files += [f for f in _starter_drive_files(now_iso) if f["id"] not in have]
-    for f in files:
-        if not f.get("live"):
-            f["webViewLink"] = None
-            f["live"] = False
-    ws["driveFiles"] = files
     for d in ws.get("docs") or []:
         if not d.get("live"):
             d["url"] = None
@@ -402,15 +261,17 @@ def ensure_workspace(user: dict) -> dict:
     prefs = ws.get("preferences")
     if not isinstance(prefs, dict):
         prefs = {}
-    prefs.setdefault("driveFolderName", "Punca Study Materials")
     prefs.setdefault("defaultReminderMinutes", 30)
     prefs.setdefault("autoCreateMeetForCircles", True)
     prefs.setdefault("autoSyncTasksFromDiagnosis", False)
     ws["preferences"] = prefs
 
-    fresh = "driveFiles" not in ws or not isinstance(ws["driveFiles"], list)
-    if fresh:
-        ws["driveFiles"] = _starter_drive_files(now_iso)
+    # The Drive feature was removed; files listed by earlier builds are dropped.
+    fresh = "calendarEvents" not in ws
+    ws.pop("driveFiles", None)
+    if isinstance(ws.get("enabledServices"), dict):
+        ws["enabledServices"].pop("drive", None)
+    prefs.pop("driveFolderName", None)
 
     if "calendarEvents" not in ws or not isinstance(ws["calendarEvents"], list):
         tomorrow = (_now() + timedelta(days=1)).replace(hour=6, minute=0, second=0, microsecond=0)

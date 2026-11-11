@@ -166,9 +166,9 @@ export default function ResultPage({ id, catalog, user, onUser }) {
     setWsNotice(null)
     try {
       const res = await api(`/google/tasks/from-diagnosis/${id}`, { method: 'POST' })
-      setWsNotice(`Added ${res.created.length} remediation task(s) to your Google Tasks to-do list!`)
+      setWsNotice(`Added ${res.created.length} step(s) to your study tasks in Google Workspace.`)
     } catch (e) {
-      setWsNotice(`Could not add to Google Tasks: ${e.message}`)
+      setWsNotice(`Could not add the tasks: ${e.message}`)
     } finally {
       setWsBusy(false)
     }
@@ -248,34 +248,37 @@ export default function ResultPage({ id, catalog, user, onUser }) {
         {!root && <p>{r.message}</p>}
       </div>
 
-      <div className="grid2 wide-right top">
-        <div className="card">
-          <h2 className="h2">How Punca got there ({diag.asked.length} questions)</h2>
-          <ol className="evidence">
-            {diag.asked.map((a) => (
-              <li key={a.probeId} className={a.correct ? 'ok' : 'no'}>
-                <div className="ev-head">
-                  <b>{a.conceptName}</b>
-                  <span>
-                    {a.correct ? 'correct' : 'incorrect'} · {CONF_LABELS[a.confidence] || 'Somewhat sure'}
-                  </span>
+      {/* The questions fill the full width in columns, so there is never an empty strip beside
+          them, however many were asked. The map and the explanation then sit side by side. */}
+      <div className="card">
+        <h2 className="h2">How Punca got there ({diag.asked.length} questions)</h2>
+        <ol className="evidence">
+          {diag.asked.map((a) => (
+            <li key={a.probeId} className={a.correct ? 'ok' : 'no'}>
+              <div className="ev-head">
+                <b>{a.conceptName}</b>
+                <span>
+                  {a.correct ? 'correct' : 'incorrect'} · {CONF_LABELS[a.confidence] || 'Somewhat sure'}
+                </span>
+              </div>
+              <div className="ev-q">{a.question}</div>
+              {!a.correct && (
+                <div className="ev-a">
+                  You chose "{a.yourAnswer}". Answer: "{a.correctAnswer}".
+                  {a.misconceptionLabel && <em> Slip: {a.misconceptionLabel.toLowerCase()}.</em>}
                 </div>
-                <div className="ev-q">{a.question}</div>
-                {!a.correct && (
-                  <div className="ev-a">
-                    You chose "{a.yourAnswer}". Answer: "{a.correctAnswer}".
-                    {a.misconceptionLabel && <em> Slip: {a.misconceptionLabel.toLowerCase()}.</em>}
-                  </div>
-                )}
-              </li>
-            ))}
-          </ol>
-          {r.skippedSolidNamed.length > 0 && (
-            <p className="fine">
-              Skipped because you already showed them: {r.skippedSolidNamed.map((x) => x.name).join(', ')}.
-            </p>
-          )}
-        </div>
+              )}
+            </li>
+          ))}
+        </ol>
+        {r.skippedSolidNamed.length > 0 && (
+          <p className="fine">
+            Skipped because you already showed them: {r.skippedSolidNamed.map((x) => x.name).join(', ')}.
+          </p>
+        )}
+      </div>
+
+      <div className={root ? 'grid2' : undefined}>
         <div className="card">
           <h2 className="h2">Where it sits</h2>
           <p className="fine">Everything {r.targetName} depends on via hard prerequisite edges. Prerequisites are on the left; your route is outlined.</p>
@@ -291,12 +294,10 @@ export default function ResultPage({ id, catalog, user, onUser }) {
           )}
           <MapLegend />
         </div>
-      </div>
 
-      {root && (
-        <>
+        {root && (
           <div className="card">
-            <div className="eyebrow">Step 5 · Remediate & Save to Google Workspace</div>
+            <div className="eyebrow">Step 5 · Rebuild and save to Google Workspace</div>
             <h2 className="h2">Rebuild {r.rootCauseName}</h2>
             {rem.loading && <Spinner label="Preparing an explanation from the course notes" />}
             <ErrorNote error={rem.error} />
@@ -326,7 +327,7 @@ export default function ResultPage({ id, catalog, user, onUser }) {
                     Save notes to Google Docs
                   </button>
                   <button type="button" className="btn ghost small" disabled={wsBusy} onClick={addToGoogleTasks}>
-                    Add route to Google Tasks to-do list
+                    Add route to my study tasks
                   </button>
                   <button type="button" className="btn ghost small" onClick={() => go('workspace')}>
                     Open Google Workspace →
@@ -335,13 +336,20 @@ export default function ResultPage({ id, catalog, user, onUser }) {
                 {wsNotice && <p className="fine" style={{ marginTop: '0.5rem' }}><b>{wsNotice}</b></p>}
               </>
             )}
-            {rem.data && rem.data.practice && rem.data.practice.length > 0 && (
-              <>
-                <h3 className="h3">Practice</h3>
-                <Practice items={rem.data.practice} />
-              </>
-            )}
           </div>
+        )}
+      </div>
+
+      {root && (
+        <>
+          {rem.data && rem.data.practice && rem.data.practice.length > 0 && (
+            <div className="card">
+              <div className="eyebrow">Step 6 · Practice</div>
+              <h2 className="h2">Try {r.rootCauseName} yourself</h2>
+              <p className="muted">These do not count towards your stamp. Use them to check the explanation has landed.</p>
+              <Practice items={rem.data.practice} />
+            </div>
+          )}
 
           <div className="grid2">
             <div className="card">
@@ -352,7 +360,7 @@ export default function ResultPage({ id, catalog, user, onUser }) {
               <Recheck conceptId={root} conceptName={r.rootCauseName} onDone={reloadMastery} />
             </div>
             <div className="card">
-              <div className="eyebrow">Step 6 · Connect with Peers (Google Meet, Chat & Calendar)</div>
+              <div className="eyebrow">Step 8 · Study with peers</div>
               <h2 className="h2">Close it with a peer study circle</h2>
               <CirclePanel conceptId={root} user={user} onUser={onUser} />
             </div>

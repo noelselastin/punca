@@ -141,7 +141,8 @@ def adapt_concept_graph(raw: dict) -> dict:
     course = {
         "id": "root-cause-prototype",
         "code": "APU-CS",
-        "name": meta.get("name") or "Root Cause concept graph (prototype)",
+        # Shown to students (passport cover), so the working label "(prototype)" is dropped.
+        "name": re.sub(r"\s*\(prototype\)\s*$", "", meta.get("name") or "", flags=re.I) or "Root Cause concept graph",
     }
 
     return {

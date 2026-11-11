@@ -7,55 +7,18 @@ import ProbeCard from '../components/ProbeCard.jsx'
 
 const fmt = (iso) => (iso ? new Date(iso).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' }) : '')
 
+// What each passport state shows on its visa: the ink mark, the line under it, and the action.
+const VISA_STATES = {
+  stamped: { action: null },
+  reentry: { action: 'Re-check to renew' },
+  'entry-required': { mark: 'Entry required', sub: 'Gap found', action: 'Re-check to stamp' },
+  shaky: { mark: 'In progress', sub: '1 re-check away', action: 'Re-check to stamp' },
+  solid: { mark: 'Solid', sub: 'Re-check to complete', action: 'Re-check to stamp' },
+  untested: { action: null },
+}
+
 function Visa({ c, onRecheck }) {
-  if (c.state === 'stamped') {
-    return (
-      <div className="visa stamped">
-        <div className="visa-head">
-          <span className="visa-code">{c.conceptId}</span>
-          {c.topicName && <span className="visa-topic">{c.topicName}</span>}
-        </div>
-        <div className="visa-name">{c.name}</div>
-        <div className="stamp stamped" aria-label="Completed stamp">
-          <span className="stamp-top">{c.renewedAt ? 'Renewed' : 'Completed'}</span>
-          <span className="stamp-mid">PUNCA</span>
-          <span className="stamp-date">{fmt(c.renewedAt || c.earnedAt)}</span>
-        </div>
-      </div>
-    )
-  }
-
-  if (c.state === 'reentry') {
-    return (
-      <div className="visa reentry">
-        <div className="visa-head">
-          <span className="visa-code">{c.conceptId}</span>
-          <span className="visa-badge reentry">Needs re-entry</span>
-        </div>
-        <div className="visa-name">{c.name}</div>
-        <div className="stamp reentry" aria-label="Re-entry required stamp">
-          <span className="stamp-top">Re-entry</span>
-          <span className="stamp-mid">REQUIRED</span>
-          <span className="stamp-date">Issued {fmt(c.earnedAt)}</span>
-        </div>
-        {c.canRecheck && (
-          <button type="button" className="btn small visa-recheck-btn" onClick={() => onRecheck(c)}>
-            Re-check to renew
-          </button>
-        )}
-      </div>
-    )
-  }
-
-  const label = {
-    'entry-required': 'Entry required · root gap',
-    shaky: 'In progress · 1 re-check away',
-    solid: 'Solid · re-check to complete',
-    untested: 'Not yet visited',
-  }[c.state] || 'Not yet visited'
-
-  const showRecheck = c.canRecheck && (c.state === 'entry-required' || c.state === 'shaky' || c.state === 'solid')
-
+  const meta = VISA_STATES[c.state] || VISA_STATES.untested
   return (
     <div className={`visa ${c.state}`}>
       <div className="visa-head">
@@ -63,10 +26,32 @@ function Visa({ c, onRecheck }) {
         {c.topicName && <span className="visa-topic">{c.topicName}</span>}
       </div>
       <div className="visa-name">{c.name}</div>
-      <div className="visa-mark">{label}</div>
-      {showRecheck && (
-        <button type="button" className="btn ghost small visa-recheck-btn" onClick={() => onRecheck(c)}>
-          Re-check to stamp
+      <div className="visa-body">
+        {c.state === 'stamped' && (
+          <div className="stamp stamped" aria-label="Completed stamp">
+            <span className="stamp-top">{c.renewedAt ? 'Renewed' : 'Completed'}</span>
+            <span className="stamp-mid">PUNCA</span>
+            <span className="stamp-date">{fmt(c.renewedAt || c.earnedAt)}</span>
+          </div>
+        )}
+        {c.state === 'reentry' && (
+          <div className="stamp reentry" aria-label="Re-entry required stamp">
+            <span className="stamp-top">Re-entry</span>
+            <span className="stamp-mid">REQUIRED</span>
+            <span className="stamp-date">Issued {fmt(c.earnedAt)}</span>
+          </div>
+        )}
+        {meta.mark && (
+          <div className={`visa-mark ${c.state}`}>
+            <b>{meta.mark}</b>
+            <small>{meta.sub}</small>
+          </div>
+        )}
+        {c.state === 'untested' && <span className="visa-untested">Not yet visited</span>}
+      </div>
+      {meta.action && c.canRecheck && (
+        <button type="button" className="visa-recheck-btn" onClick={() => onRecheck(c)}>
+          {meta.action}
         </button>
       )}
     </div>
@@ -193,11 +178,13 @@ export default function PassportPage({ catalog, welcome }) {
     return s || 'untested'
   }
   const ws = p.googleWorkspace || {}
-  const summary = p.stampSummary || {
-    completed: allConcepts.filter((c) => c.state === 'stamped').length,
-    reentry: allConcepts.filter((c) => c.state === 'reentry').length,
-    entryRequired: allConcepts.filter((c) => c.state === 'entry-required').length,
-    inProgress: allConcepts.filter((c) => c.state === 'shaky' || c.state === 'solid').length,
+  // Counted from the same list the filters use, so a tile's number always matches what it shows.
+  const countOf = (...states) => allConcepts.filter((c) => states.includes(c.state)).length
+  const summary = {
+    completed: countOf('stamped'),
+    reentry: countOf('reentry'),
+    entryRequired: countOf('entry-required'),
+    inProgress: countOf('shaky', 'solid'),
   }
   const untestedCount = allConcepts.filter((c) => c.state === 'untested').length
 
@@ -223,7 +210,7 @@ export default function PassportPage({ catalog, welcome }) {
           <div>
             <div className="eyebrow">Passport issued</div>
             <h2 className="h2">Welcome aboard, {p.holder}. Your first completed stamp is 5–10 questions away.</h2>
-            <p className="muted">Tell Punca where you’re stuck or upload your lab file from PC or Google Drive. It assesses your foundations and helps you fix the exact root gap.</p>
+            <p className="muted">Tell Punca where you’re stuck or upload your lab file from your PC. It assesses your foundations and helps you fix the exact root gap.</p>
           </div>
           <button className="btn primary" onClick={() => go('diagnose')}>Find my first gap</button>
         </div>
@@ -243,58 +230,33 @@ export default function PassportPage({ catalog, welcome }) {
         />
         <div className="pp-actions">
           <button className="btn small" onClick={() => go('setup')}>Customise passport & photo</button>
+          <button className="btn ghost small" onClick={() => go('profile')}>Edit profile</button>
           <button className="btn ghost small" onClick={() => go('workspace')}>
-            Google Workspace ({ws.driveCount || 0} Drive files · {ws.openTasksCount || 0} Tasks · {ws.docsCount || 0} Docs)
+            Google Workspace ({ws.calendarCount || 0} sessions · {ws.openTasksCount || 0} tasks · {ws.docsCount || 0} docs)
           </button>
           <button className="btn ghost small" onClick={() => go('diagnose')}>Diagnose a lab or question</button>
         </div>
 
         <div className="pp-stamp-summary">
-          <button
-            type="button"
-            className={`pp-stat-tile completed ${statusFilter === 'completed' ? 'active' : ''}`}
-            onClick={() => setStatusFilter(statusFilter === 'completed' ? 'all' : 'completed')}
-          >
-            <span className="pp-stat-num">{summary.completed}</span>
-            <span className="pp-stat-label">Completed by you</span>
-            <span className="pp-stat-sub">Passed re-check stamps</span>
-          </button>
-          <button
-            type="button"
-            className={`pp-stat-tile reentry ${statusFilter === 'reentry' ? 'active' : ''}`}
-            onClick={() => setStatusFilter(statusFilter === 'reentry' ? 'all' : 'reentry')}
-          >
-            <span className="pp-stat-num">{summary.reentry}</span>
-            <span className="pp-stat-label">Needs re-entry</span>
-            <span className="pp-stat-sub">Slipped stamps to renew</span>
-          </button>
-          <button
-            type="button"
-            className={`pp-stat-tile entry-required ${statusFilter === 'entry-required' ? 'active' : ''}`}
-            onClick={() => setStatusFilter(statusFilter === 'entry-required' ? 'all' : 'entry-required')}
-          >
-            <span className="pp-stat-num">{summary.entryRequired}</span>
-            <span className="pp-stat-label">Entry required</span>
-            <span className="pp-stat-sub">Diagnosed root-cause gaps</span>
-          </button>
-          <button
-            type="button"
-            className={`pp-stat-tile in-progress ${statusFilter === 'in-progress' ? 'active' : ''}`}
-            onClick={() => setStatusFilter(statusFilter === 'in-progress' ? 'all' : 'in-progress')}
-          >
-            <span className="pp-stat-num">{summary.inProgress}</span>
-            <span className="pp-stat-label">In progress</span>
-            <span className="pp-stat-sub">Shaky · 1 re-check away</span>
-          </button>
-          <button
-            type="button"
-            className={`pp-stat-tile untested ${statusFilter === 'untested' ? 'active' : ''}`}
-            onClick={() => setStatusFilter(statusFilter === 'untested' ? 'all' : 'untested')}
-          >
-            <span className="pp-stat-num">{untestedCount}</span>
-            <span className="pp-stat-label">Not visited yet</span>
-            <span className="pp-stat-sub">Out of {allConcepts.length} concepts</span>
-          </button>
+          {[
+            ['completed', 'completed', summary.completed, 'Completed by you', 'Stamps you earned'],
+            ['reentry', 'reentry', summary.reentry, 'Needs re-entry', 'Slipped stamps to renew'],
+            ['entry-required', 'entry', summary.entryRequired, 'Entry required', 'Gaps to close'],
+            ['in-progress', 'progress', summary.inProgress, 'In progress', 'Re-check to complete'],
+            ['untested', 'untested', untestedCount, 'Not visited yet', `Out of ${allConcepts.length} concepts`],
+          ].map(([key, cls, count, label, sub]) => (
+            <button
+              key={key}
+              type="button"
+              className={`pp-stat-tile ${cls} ${statusFilter === key ? 'on' : ''}`}
+              aria-pressed={statusFilter === key}
+              onClick={() => setStatusFilter(statusFilter === key ? 'all' : key)}
+            >
+              <b>{count}</b>
+              <span>{label}</span>
+              <small>{sub}</small>
+            </button>
+          ))}
         </div>
 
         {p.next ? (
@@ -348,7 +310,7 @@ export default function PassportPage({ catalog, welcome }) {
               ))}
               {statusFilter !== 'all' && (
                 <button type="button" className="chip-btn" onClick={() => setStatusFilter('all')}>
-                  Clear status filter ({statusFilter}) ×
+                  Clear filter ×
                 </button>
               )}
             </div>

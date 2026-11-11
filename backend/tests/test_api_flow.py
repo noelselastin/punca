@@ -116,7 +116,7 @@ def test_demo_accounts_and_passport_reentry_states(client):
     res = client.get("/api/demo/accounts")
     assert res.status_code == 200
     accounts = res.json()["accounts"]
-    assert len(accounts) == 5
+    assert len(accounts) == 7
 
     login_res = client.post("/api/auth/login", json={"email": "aisyah.student@demo.punca.edu", "password": DEMO_PASSWORD})
     assert login_res.status_code == 200
@@ -134,7 +134,7 @@ def test_demo_flow_diagnose_with_file_stamp_and_peer_circle(client, catalog):
     stu = client.post("/api/auth/login", json={"email": DEMO_STUDENT_EMAIL, "password": DEMO_PASSWORD}).json()["token"]
     h = auth(stu)
 
-    # Map stuck point with an uploaded document from PC and save to Google Drive
+    # Map stuck point with a document uploaded from PC
     doc_bytes = b"Lab 7 Calculus: Implement gradient descent by computing partial derivatives and applying the chain rule."
     m = client.post(
         "/api/map",
@@ -142,7 +142,6 @@ def test_demo_flow_diagnose_with_file_stamp_and_peer_circle(client, catalog):
             "stuckInput": "Minimising a function with gradient descent and partial derivatives",
             "fileName": "Calculus_Gradient_Lab.txt",
             "fileBase64": base64.b64encode(doc_bytes).decode("ascii"),
-            "saveToDrive": True,
         },
         headers=h,
     ).json()
@@ -176,7 +175,7 @@ def test_demo_flow_diagnose_with_file_stamp_and_peer_circle(client, catalog):
     assert rem["found"] and rem["citations"][0]["sourceId"] == "cm.md#CM-CHAIN"
     assert len(rem["practice"]) == 3
 
-    # Export remediation to Google Docs & Google Tasks
+    # Export remediation to Google Docs and to the study task list
     gdoc = client.post(f"/api/google/docs/from-diagnosis/{d['id']}", headers=h)
     assert gdoc.status_code == 200 and "CM-CHAIN" in gdoc.json()["doc"]["content"]
     gtasks = client.post(f"/api/google/tasks/from-diagnosis/{d['id']}", headers=h)
@@ -203,9 +202,11 @@ def test_demo_flow_diagnose_with_file_stamp_and_peer_circle(client, catalog):
     pp_after = client.get("/api/me/passport", headers=h).json()
     assert pp_after["stampSummary"]["completed"] == 1
 
-    # Peer study circle with Google Meet, Google Chat, and Google Calendar
+    # Peer study circle with a circle chat, Google Meet and Google Calendar. The demo accounts
+    # already have a chain rule circle with room, so that one is suggested.
     sug = client.get("/api/circles/suggestion", headers=h).json()
-    assert sug["status"] == "proposal" and sug["circle"]["mode"] == "peer"
+    assert sug["status"] == "existing" and sug["circle"]["mode"] == "peer"
+    assert sug["circle"]["id"] == "c-demo-chain"
     circle = client.post("/api/circles/join", json={"conceptId": "CM-CHAIN"}, headers=h).json()
     assert circle["isMember"] and 3 <= circle["memberCount"] <= 6
     assert circle["meetNewUrl"] == "https://meet.google.com/new"

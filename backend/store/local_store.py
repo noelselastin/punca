@@ -10,6 +10,7 @@ import json
 import logging
 import os
 import threading
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Callable, Iterable
 
@@ -23,6 +24,7 @@ class LocalStore:
     def __init__(self, path: Path):
         self.path = Path(path)
         self._lock = threading.RLock()
+        self._deferred = 0
         self.data: dict[str, dict[str, dict]] = {c: {} for c in COLLECTIONS}
         if self.path.exists():
             try:
@@ -38,8 +40,22 @@ class LocalStore:
     def empty(self) -> bool:
         return not any(self.data[c] for c in COLLECTIONS)
 
+    @contextmanager
+    def batch(self):
+        """Hold back file writes while many documents change, then write once at the end."""
+        with self._lock:
+            self._deferred += 1
+        try:
+            yield self
+        finally:
+            with self._lock:
+                self._deferred -= 1
+            self.save()
+
     def save(self) -> None:
         with self._lock:
+            if self._deferred:
+                return
             self.path.parent.mkdir(parents=True, exist_ok=True)
             tmp = self.path.with_suffix(".tmp")
             tmp.write_text(json.dumps(self.data, ensure_ascii=False, indent=1), encoding="utf-8")

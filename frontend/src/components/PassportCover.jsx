@@ -108,7 +108,7 @@ export default function PassportCover({
         <PassportPhoto photoUrl={style.photoUrl} holder={holder} size={photoSize} />
         <div>
           <div className="pp-title">PUNCA PASSPORT</div>
-          <div className="pp-sub">Pasport Punca · study aid, not a grade or credential</div>
+          <div className="pp-sub">Passport Punca · study aid, not a grade or credential</div>
         </div>
       </div>
       <div className="pp-holder">

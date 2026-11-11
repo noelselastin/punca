@@ -9,6 +9,7 @@ import CirclesPage from './pages/CirclesPage.jsx'
 import HistoryPage from './pages/HistoryPage.jsx'
 import LandingPage from './pages/LandingPage.jsx'
 import PassportSetupPage from './pages/PassportSetupPage.jsx'
+import ProfilePage from './pages/ProfilePage.jsx'
 import GoogleWorkspacePage from './pages/GoogleWorkspacePage.jsx'
 import Brand from './components/Brand.jsx'
 
@@ -31,7 +32,6 @@ export default function App() {
   const [health, setHealth] = useState(null)
   const [catalog, setCatalog] = useState(null)
   const [route, setRoute] = useState(parseHash())
-  const [diagnosePrefill, setDiagnosePrefill] = useState(null)
 
   useEffect(() => {
     const onHash = () => setRoute(parseHash())
@@ -81,10 +81,11 @@ export default function App() {
   else if (page === 'setup') body = <PassportSetupPage user={user} catalog={catalog} onUser={setUser} />
   else if (page === 'diagnosis') body = <ResultPage id={route.id} catalog={catalog} user={user} onUser={setUser} />
   else if (page === 'passport') body = <PassportPage key={route.id || 'pp'} catalog={catalog} user={user} onUser={setUser} welcome={route.id === 'welcome'} />
-  else if (page === 'workspace') body = <GoogleWorkspacePage user={user} onUser={setUser} onDiagnoseFile={setDiagnosePrefill} />
+  else if (page === 'workspace') body = <GoogleWorkspacePage user={user} onUser={setUser} />
   else if (page === 'circles') body = <CirclesPage user={user} onUser={setUser} />
   else if (page === 'history') body = <HistoryPage />
-  else body = <DiagnosePage prefill={diagnosePrefill} onClearPrefill={() => setDiagnosePrefill(null)} />
+  else if (page === 'profile') body = <ProfilePage user={user} onUser={setUser} />
+  else body = <DiagnosePage />
 
   const llm = health && health.llm
   return (
@@ -102,12 +103,12 @@ export default function App() {
               {llm.mode === 'offline' ? 'Offline mode' : `Gemini · ${llm.model}`}
             </span>
           )}
-          <span className="who">{user.name}<small>Student</small></span>
+          <a className={`who ${page === 'profile' ? 'active' : ''}`} href="#/profile" title="Edit your profile">{user.name}<small>Edit profile</small></a>
           <button className="btn ghost small" onClick={signOut}>Sign out</button>
         </div>
       </header>
       <main className="page">{body}</main>
-      <footer className="foot">Punca prototype · APU Cloud Innovation Hackathon 2026 · cohort data in this demo is synthetic</footer>
+      <footer className="foot">Punca • APU Cloud Innovation Hackathon 2026</footer>
     </div>
   )
 }

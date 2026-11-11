@@ -182,11 +182,11 @@ function FlightJourney() {
 
 const FAQ = [
   ['How is this different from asking an AI chatbot?', <>Punca checks the earlier concepts behind your question or uploaded lab document across 5–10 confidence-weighted checks, then shows the exact hard-prerequisite chain that led to its suggested gap. You get a focused explanation with course-note sources, practice, and a re-check.</>],
-  ['What can I study in the prototype?', <>The prototype covers 138 connected concepts across 6 modules and 28 topics: Maths Foundations, Computing Foundations, Computational Mathematics, Introduction to Python, Object Oriented Programming with Java, and Introduction to Databases.</>],
+  ['What can I study on Punca?', <>Punca currently covers six modules: Maths Foundations, Computing &amp; Programming Foundations, Computational Mathematics, Introduction to Python, Object Oriented Programming with Java, and Introduction to Databases. Together they hold 28 topics and 138 connected concepts, each with its own diagnostic questions. More modules and concepts will be added over time.</>],
   ['How do I earn a passport stamp?', <>Work on a concept and pass re-checks until your understanding reaches Solid. A diagnosis or a study-circle visit alone does not earn a stamp. These are personal learning aids, not academic grades or qualifications.</>],
-  ['Can I study with other students?', <>Yes. Share your free hours to find a peer study circle around a common gap, complete with Google Meet video rooms, Google Chat spaces, and Google Calendar scheduling.</>],
-  ['Who can see my gaps and my passport?', <>Your passport is private to you. Sharing your name in a peer study circle is opt-in. This is a local hackathon prototype, so use demo details while exploring it.</>],
-  ['Is it free, and what if Punca gets it wrong?', <>The prototype is free to try. Its diagnosis is an estimate. You can challenge a result with “I actually know this” and take a re-check, or save notes and tasks to Google Docs and Google Tasks.</>],
+  ['Can I study with other students?', <>Yes. Share your free hours to find a peer study circle around a common gap, complete with a circle chat, Google Meet video rooms and Google Calendar scheduling.</>],
+  ['Who can see my gaps and my passport?', <>Your passport is private to you. Sharing your name and contact email with study-circle peers is opt-in, and you can switch it off at any time.</>],
+  ['Is it free, and what if Punca gets it wrong?', <>Punca is free to use. Its diagnosis is an estimate. You can challenge a result with “I actually know this” and take a re-check, or save your notes to Google Docs.</>],
 ]
 
 export default function LandingPage({ user, onStart, onSignIn }) {
@@ -201,11 +201,11 @@ export default function LandingPage({ user, onStart, onSignIn }) {
 
     <main id="pn-main" tabIndex={-1}>
       <section className="pn-hero pn-container">
-        <div className="pn-hero-copy"><p className="pn-eyebrow pn-hero-eyebrow"><span />Identify knowledge gaps. Strengthen your foundations.</p>
-          <h1>Learn with<br /><em>confidence.</em></h1>
-          <p className="pn-hero-lead">For the concepts that never quite clicked.<br />Learn, Without the blind spots<br />Identify knowledge gaps. Strengthen your foundations. Learn with confidence.</p>
+        <div className="pn-hero-copy"><p className="pn-eyebrow pn-hero-eyebrow"><span />For the concepts that never quite clicked.</p>
+          <h1>Learn,<br /><em>Without the blind spots.</em></h1>
+          <p className="pn-hero-lead">Identify knowledge gaps. Strengthen your foundations. Learn with confidence.</p>
           <div className="pn-hero-actions"><button className="pn-button" onClick={onStart}>{startLabel}<Arrow diagonal /></button><button className="pn-link-button" onClick={() => jumpTo('pn-journey')}>See the journey <span aria-hidden="true">↓</span></button></div>
-          <p className="pn-hero-foot">5–10 foundation questions to pinpoint your starting point.<br /><span>Free prototype · Made for university students</span></p>
+          <p className="pn-hero-foot">5–10 foundation questions to pinpoint your starting point.</p>
         </div>
         <PassportStill />
       </section>

@@ -1,16 +1,7 @@
-import React, { useRef, useState } from 'react'
+import React, { useState } from 'react'
 import { api } from '../api.js'
 import { ErrorNote, Spinner, Toggle, go, useAsync } from '../components/common.jsx'
-import { requestGoogleAccessToken } from '../googleAuth.js'
-
-function readFileAsBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onerror = () => reject(new Error('Could not read file.'))
-    reader.onload = () => resolve(reader.result)
-    reader.readAsDataURL(file)
-  })
-}
+import { GOOGLE_NOT_SET_UP, connectGoogle } from '../googleAuth.js'
 
 function addOneHourLocal(isoLocal) {
   if (!isoLocal) return ''
@@ -21,13 +12,12 @@ function addOneHourLocal(isoLocal) {
   return `${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}T${pad(end.getHours())}:${pad(end.getMinutes())}`
 }
 
-export default function GoogleWorkspacePage({ onDiagnoseFile }) {
+export default function GoogleWorkspacePage() {
   const [ws, reload] = useAsync(() => api('/google/status'), [])
-  const [tab, setTab] = useState('drive')
+  const [tab, setTab] = useState('calendar')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
   const [notice, setNotice] = useState(null)
-  const fileInputRef = useRef(null)
 
   // Calendar form state
   const [calForm, setCalForm] = useState({
@@ -59,13 +49,11 @@ export default function GoogleWorkspacePage({ onDiagnoseFile }) {
   // Customize form state
   const [oauthEmail, setOauthEmail] = useState('')
   const [oauthToken, setOauthToken] = useState('')
-  const [folderName, setFolderName] = useState('')
 
   if (ws.loading) return <Spinner label="Loading Google Workspace" />
   if (ws.error) return <ErrorNote error={ws.error} />
   const data = ws.data
   const enabled = data.enabledServices || {}
-  const prefs = data.preferences || {}
 
   const act = async (fn, msg) => {
     setBusy(true)
@@ -84,44 +72,48 @@ export default function GoogleWorkspacePage({ onDiagnoseFile }) {
 
   const handleLiveGoogleConnect = () =>
     act(async () => {
-      const token = await requestGoogleAccessToken(data.oauthClientId, data.email)
-      await api('/google/connect', {
-        method: 'POST',
-        body: { accessToken: token },
-      })
-    }, 'Connected live Google Account! Drive, Docs, Calendar, and Tasks now sync directly with your Google account.')
+      await connectGoogle(data)
+    }, 'Google account connected. Calendar and Docs now use your own Google account.')
 
   const handleLiveGoogleDisconnect = () =>
     act(async () => {
       await api('/google/disconnect', { method: 'POST' })
-    }, 'Disconnected live Google OAuth token. Built-in Google Workspace mode remains active.')
+    }, 'Google account disconnected. Your sessions, tasks and notes are still in Punca.')
 
-  const handleDriveUpload = async (e) => {
-    const file = e.target.files && e.target.files[0]
-    if (!file) return
-    await act(async () => {
-      const b64 = await readFileAsBase64(file)
-      await api('/google/drive/upload', {
-        method: 'POST',
-        body: {
-          fileName: file.name,
-          fileBase64: b64,
-          mimeType: file.type || 'text/plain',
-        },
-      })
-    }, `Uploaded "${file.name}" to Google Drive (${prefs.driveFolderName || 'Punca Study Materials'}).`)
-    if (fileInputRef.current) fileInputRef.current.value = ''
-  }
-
-  const diagnoseWithDriveFile = (f) => {
-    if (onDiagnoseFile) {
-      onDiagnoseFile({
-        stuckInput: `Struggling with ${f.name}: ${f.summary || ''}`.slice(0, 400),
-        driveFile: f,
-      })
+  // Writing to the student's Google account needs a connection. Returns false (with an
+  // explanation on screen) when Google sign-in is not available on this server.
+  const ensureLive = async () => {
+    if (data.liveConnected) return true
+    if (!data.liveAvailable) {
+      setNotice(`${GOOGLE_NOT_SET_UP} Use the Open Google links for now.`)
+      return false
     }
-    go('diagnose')
+    await connectGoogle(data)
+    return true
   }
+
+  const withGoogle = async (fn, msg) => {
+    setBusy(true)
+    setError(null)
+    setNotice(null)
+    try {
+      if (await ensureLive()) {
+        await fn()
+        if (msg) setNotice(msg)
+      }
+      await reload()
+    } catch (e) {
+      setError(e)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const addEventToGoogle = (ev) =>
+    withGoogle(
+      () => api(`/google/calendar/events/${ev.id}/sync`, { method: 'POST' }),
+      `Added "${ev.title}" to your Google Calendar.`,
+    )
 
   const createCalendarEvent = (e) => {
     e.preventDefault()
@@ -151,7 +143,7 @@ export default function GoogleWorkspacePage({ onDiagnoseFile }) {
         meetUrl: '',
         includeMeet: true,
       })
-    }, 'Scheduled session! Click "Add to Google Calendar ↗" on the event to save it directly in your Google Calendar.')
+    }, 'Session scheduled. Use "Add to Google Calendar" on the session to save it in your Google Calendar.')
   }
 
   const createTask = (e) => {
@@ -164,7 +156,7 @@ export default function GoogleWorkspacePage({ onDiagnoseFile }) {
       setTaskTitle('')
       setTaskNotes('')
       setTaskDue('')
-    }, 'Added task to Google Tasks!')
+    }, 'Task added to your study tasks.')
   }
 
   const toggleTask = (t) =>
@@ -217,7 +209,7 @@ export default function GoogleWorkspacePage({ onDiagnoseFile }) {
       })
       setSpaceName('')
       setSpaceMeetUrl('')
-    }, 'Created Google Chat peer discussion space!')
+    }, 'Discussion space created.')
   }
 
   const saveCircleMeetFromSpace = (circleId, spaceId) => {
@@ -250,7 +242,7 @@ export default function GoogleWorkspacePage({ onDiagnoseFile }) {
         method: 'POST',
         body: { enabledServices: { [serviceKey]: val } },
       })
-    }, `Updated Google ${serviceKey.charAt(0).toUpperCase() + serviceKey.slice(1)} setting.`)
+    }, 'Setting updated.')
 
   const saveCustomization = (e) => {
     e.preventDefault()
@@ -258,12 +250,9 @@ export default function GoogleWorkspacePage({ onDiagnoseFile }) {
       const body = {}
       if (oauthEmail.trim()) body.email = oauthEmail.trim()
       if (oauthToken.trim()) body.accessToken = oauthToken.trim()
-      if (folderName.trim()) {
-        body.preferences = { ...prefs, driveFolderName: folderName.trim() }
-      }
       await api('/google/configure', { method: 'POST', body })
       setOauthToken('')
-    }, 'Saved Google Workspace connection & customization settings!')
+    }, 'Workspace settings saved.')
   }
 
   return (
@@ -278,7 +267,7 @@ export default function GoogleWorkspacePage({ onDiagnoseFile }) {
           </div>
           <div className="ws-conn-actions">
             <span className={`chip ${data.liveConnected ? 'state-stamped' : 'state-endorsed'}`}>
-              {data.liveConnected ? '● Live Google Account Synced' : '● Built-in Workspace + Direct Google Links'}
+              {data.liveConnected ? '● Google account connected' : '● Google account not connected'}
             </span>
             {data.liveAvailable && !data.liveConnected && (
               <button type="button" className="btn small primary" disabled={busy} onClick={handleLiveGoogleConnect}>
@@ -287,26 +276,23 @@ export default function GoogleWorkspacePage({ onDiagnoseFile }) {
             )}
             {data.liveConnected && (
               <button type="button" className="btn ghost small" disabled={busy} onClick={handleLiveGoogleDisconnect}>
-                Disconnect Live OAuth
+                Disconnect Google
               </button>
             )}
           </div>
         </div>
         <p className="muted">
-          Upload and retrieve lab files in <b>Google Drive</b>, schedule peer circles in <b>Google Calendar</b>, manage study to-dos in <b>Google Tasks</b>, discuss in <b>Google Chat &amp; Meet</b>, and keep notes in <b>Google Docs</b>.
+          Schedule study sessions in <b>Google Calendar</b>, keep a study to-do list, talk to your study circle with chat and <b>Google Meet</b>, and keep notes in <b>Google Docs</b>.
         </p>
         <div className="pp-tabs" style={{ marginTop: '1rem' }}>
-          <button className={tab === 'drive' ? 'on' : ''} onClick={() => setTab('drive')}>
-            Google Drive ({(data.driveFiles || []).length})
-          </button>
           <button className={tab === 'calendar' ? 'on' : ''} onClick={() => setTab('calendar')}>
             Google Calendar ({(data.calendarEvents || []).length})
           </button>
           <button className={tab === 'tasks' ? 'on' : ''} onClick={() => setTab('tasks')}>
-            Google Tasks ({(data.tasks || []).filter((t) => !t.completed).length} open)
+            Study tasks ({(data.tasks || []).filter((t) => !t.completed).length} open)
           </button>
           <button className={tab === 'chat' ? 'on' : ''} onClick={() => setTab('chat')}>
-            Google Chat &amp; Meet ({(data.chatSpaces || []).length})
+            Chat and Google Meet ({(data.chatSpaces || []).length})
           </button>
           <button className={tab === 'docs' ? 'on' : ''} onClick={() => setTab('docs')}>
             Google Docs ({(data.docs || []).length})
@@ -318,81 +304,6 @@ export default function GoogleWorkspacePage({ onDiagnoseFile }) {
         {notice && <p className="fine" style={{ marginTop: '0.6rem' }}><b>{notice}</b></p>}
         <ErrorNote error={error} />
       </div>
-
-      {/* ---- GOOGLE DRIVE ---- */}
-      {tab === 'drive' && (
-        <div className="card">
-          <div className="ws-section-head">
-            <div>
-              <div className="eyebrow">Google Drive · Folder: {prefs.driveFolderName || 'Punca Study Materials'}</div>
-              <h2 className="h2">Upload &amp; Retrieve Lab Files</h2>
-              <p className="muted">
-                Upload lab briefs, code worksheets, slides, or PDFs. Every file here is immediately available in the <b>Diagnose</b> Google Drive picker.
-              </p>
-            </div>
-            <div className="actions left" style={{ marginTop: 0 }}>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".txt,.md,.py,.java,.c,.cpp,.js,.sql,.csv,.json,.ipynb,.docx,.pptx,.pdf"
-                onChange={handleDriveUpload}
-                style={{ display: 'none' }}
-              />
-              <button
-                type="button"
-                className="btn primary"
-                disabled={busy}
-                onClick={() => fileInputRef.current && fileInputRef.current.click()}
-              >
-                ☁️ + Upload file to Google Drive
-              </button>
-              <a className="btn ghost small" href="https://drive.google.com/drive/my-drive" target="_blank" rel="noreferrer">
-                Open Google Drive ↗
-              </a>
-            </div>
-          </div>
-
-          <div className="ws-list">
-            {(data.driveFiles || []).map((f) => {
-              const sourceLabel =
-                f.source === 'google_drive'
-                  ? 'Live Google Drive'
-                  : f.source === 'uploaded'
-                    ? 'Uploaded by you'
-                    : 'Course starter file'
-              return (
-                <div key={f.id} className="ws-item">
-                  <div className="ws-item-main">
-                    <div className="eyebrow">
-                      {f.folder || 'Google Drive'} · {f.mimeType} · <b>{sourceLabel}</b>
-                    </div>
-                    <h3>{f.name}</h3>
-                    <p className="muted">{f.summary}</p>
-                  </div>
-                  <div className="actions left">
-                    <button type="button" className="btn small primary" onClick={() => diagnoseWithDriveFile(f)}>
-                      Assess foundations in Diagnose →
-                    </button>
-                    {f.webViewLink && (
-                      <a className="btn small" href={f.webViewLink} target="_blank" rel="noreferrer">
-                        Open in Google Drive ↗
-                      </a>
-                    )}
-                    <button
-                      type="button"
-                      className="btn ghost small"
-                      disabled={busy}
-                      onClick={() => act(() => api(`/google/drive/${f.id}`, { method: 'DELETE' }), 'Removed file from Google Drive.')}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
 
       {/* ---- GOOGLE CALENDAR ---- */}
       {tab === 'calendar' && (
@@ -418,30 +329,33 @@ export default function GoogleWorkspacePage({ onDiagnoseFile }) {
                       )}
                     </div>
                     <div className="actions left">
-                      {(ev.htmlLink || ev.calendarLink) && (
-                        <a
-                          className="btn small primary"
-                          href={ev.htmlLink || ev.calendarLink}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          📅 Add to Google Calendar ↗
+                      {ev.live ? (
+                        <a className="btn small" href={ev.calendarLink} target="_blank" rel="noreferrer">
+                          Open in Google Calendar ↗
                         </a>
-                      )}
+                      ) : data.liveConnected ? (
+                        <button type="button" className="btn small primary" disabled={busy} onClick={() => addEventToGoogle(ev)}>
+                          Add to Google Calendar
+                        </button>
+                      ) : ev.calendarLink ? (
+                        <a className="btn small primary" href={ev.calendarLink} target="_blank" rel="noreferrer">
+                          Add to Google Calendar ↗
+                        </a>
+                      ) : null}
                       {ev.meetUrl ? (
                         <a className="btn small" href={ev.meetUrl} target="_blank" rel="noreferrer">
-                          📹 Join Google Meet ↗
+                          Join Google Meet ↗
                         </a>
                       ) : (
                         <a className="btn ghost small" href="https://meet.google.com/new" target="_blank" rel="noreferrer">
-                          📹 Start Google Meet ↗
+                          Start Google Meet ↗
                         </a>
                       )}
                       <button
                         type="button"
                         className="btn ghost small"
                         disabled={busy}
-                        onClick={() => act(() => api(`/google/calendar/events/${ev.id}`, { method: 'DELETE' }), 'Removed event from Google Calendar.')}
+                        onClick={() => act(() => api(`/google/calendar/events/${ev.id}`, { method: 'DELETE' }), 'Removed the session from Punca.')}
                       >
                         Remove
                       </button>
@@ -487,7 +401,7 @@ export default function GoogleWorkspacePage({ onDiagnoseFile }) {
               <input
                 value={calForm.attendeesText}
                 onChange={(e) => setCalForm({ ...calForm, attendeesText: e.target.value })}
-                placeholder="aisyah.punca@gmail.com, hafiz.punca@gmail.com"
+                placeholder="friend.one@gmail.com, friend.two@gmail.com"
               />
             </label>
             <label className="field">
@@ -512,7 +426,7 @@ export default function GoogleWorkspacePage({ onDiagnoseFile }) {
             {data.liveConnected && (
               <Toggle
                 checked={calForm.includeMeet}
-                label="Automatically create a Google Meet conference link via Google Calendar API"
+                label="Create a Google Meet room for this session automatically"
                 onChange={(v) => setCalForm({ ...calForm, includeMeet: v })}
               />
             )}
@@ -525,18 +439,15 @@ export default function GoogleWorkspacePage({ onDiagnoseFile }) {
         </div>
       )}
 
-      {/* ---- GOOGLE TASKS ---- */}
+      {/* ---- STUDY TASKS ---- */}
       {tab === 'tasks' && (
         <div className="grid2 top">
           <div className="card">
             <div className="ws-section-head">
               <div>
-                <div className="eyebrow">Google Tasks · Study To-Do List</div>
-                <h2 className="h2">My Study Tasks</h2>
+                <div className="eyebrow">Study to-do list</div>
+                <h2 className="h2">My study tasks</h2>
               </div>
-              <a className="btn ghost small" href="https://tasks.google.com/" target="_blank" rel="noreferrer">
-                Open Google Tasks ↗
-              </a>
             </div>
             {(data.tasks || []).length === 0 ? (
               <p className="muted">No tasks yet. Add a task on the right or export a remediation route from a diagnosis result.</p>
@@ -571,17 +482,17 @@ export default function GoogleWorkspacePage({ onDiagnoseFile }) {
           </div>
 
           <form className="card" onSubmit={createTask}>
-            <div className="eyebrow">Add To-Do Item</div>
-            <h2 className="h2">New Google Task</h2>
-            <label className="field">Task Title
+            <div className="eyebrow">Add a to-do item</div>
+            <h2 className="h2">New task</h2>
+            <label className="field">Task title
               <input
                 value={taskTitle}
                 onChange={(e) => setTaskTitle(e.target.value)}
-                placeholder="e.g. Complete re-check for Chain Rule (CM-CHAIN)"
+                placeholder="e.g. Complete re-check for Chain Rule"
                 required
               />
             </label>
-            <label className="field">Due Date <small>(optional)</small>
+            <label className="field">Due date <small>(optional)</small>
               <input
                 type="date"
                 value={taskDue}
@@ -598,36 +509,39 @@ export default function GoogleWorkspacePage({ onDiagnoseFile }) {
             </label>
             <div className="actions">
               <button className="btn primary" disabled={busy || !taskTitle.trim()}>
-                Add to Google Tasks
+                Add task
               </button>
             </div>
           </form>
         </div>
       )}
 
-      {/* ---- GOOGLE CHAT & MEET ---- */}
+      {/* ---- CHAT AND GOOGLE MEET ---- */}
       {tab === 'chat' && (
         <div className="grid2 top">
           <div className="card">
-            <div className="eyebrow">Google Chat &amp; Google Meet · Peer Discussions</div>
-            <h2 className="h2">Peer Group Spaces</h2>
+            <div className="eyebrow">Chat and Google Meet · peer discussions</div>
+            <h2 className="h2">Discussion spaces</h2>
+            {(data.chatSpaces || []).length === 0 && (
+              <p className="muted">No spaces yet. Joining a study circle adds its chat here, or create a space on the right.</p>
+            )}
             {(data.chatSpaces || []).map((sp) => (
               <div key={sp.id} className="circle-card" style={{ marginBottom: '1rem' }}>
                 <div className="circle-head">
                   <div>
                     <div className="eyebrow">
-                      Google Chat Space {sp.circleId ? '· Linked to Peer Study Circle' : ''}
+                      {sp.circleId ? 'Study circle chat' : 'Discussion space'}
                     </div>
                     <h3>{sp.name}</h3>
                   </div>
                   <div className="actions left" style={{ marginTop: 0 }}>
                     {sp.meetUrl ? (
                       <a className="btn small primary" href={sp.meetUrl} target="_blank" rel="noreferrer">
-                        📹 Join Google Meet ↗
+                        Join Google Meet ↗
                       </a>
                     ) : (
                       <a className="btn small" href={sp.meetNewUrl || 'https://meet.google.com/new'} target="_blank" rel="noreferrer">
-                        📹 Start Google Meet ↗
+                        Start Google Meet ↗
                       </a>
                     )}
                   </div>
@@ -680,7 +594,7 @@ export default function GoogleWorkspacePage({ onDiagnoseFile }) {
 
           <form className="card" onSubmit={createChatSpace}>
             <div className="eyebrow">Create Peer Discussion Space</div>
-            <h2 className="h2">New Google Chat &amp; Meet Space</h2>
+            <h2 className="h2">New discussion space</h2>
             <p className="muted">
               Create a dedicated space for your peer study group. Start a video room at{' '}
               <a href="https://meet.google.com/new" target="_blank" rel="noreferrer">meet.google.com/new ↗</a>{' '}
@@ -704,7 +618,7 @@ export default function GoogleWorkspacePage({ onDiagnoseFile }) {
             </label>
             <div className="actions">
               <a className="btn ghost small" href="https://meet.google.com/new" target="_blank" rel="noreferrer">
-                📹 Start a Meet room ↗
+                Start a Meet room ↗
               </a>
               <button className="btn primary" disabled={busy || !spaceName.trim()}>
                 Create Space
@@ -724,7 +638,7 @@ export default function GoogleWorkspacePage({ onDiagnoseFile }) {
                 <h2 className="h2">Saved Study Docs</h2>
               </div>
               <a className="btn ghost small" href="https://docs.google.com/document/create" target="_blank" rel="noreferrer">
-                📄 Blank Google Doc ↗
+                Blank Google Doc ↗
               </a>
             </div>
             {(data.docs || []).map((doc) => (
@@ -739,7 +653,7 @@ export default function GoogleWorkspacePage({ onDiagnoseFile }) {
                     Edit notes
                   </button>
                   <button type="button" className="btn ghost small" onClick={() => copyDocNotes(doc)}>
-                    📋 Copy notes
+                    Copy notes
                   </button>
                   {doc.url && (
                     <a className="btn small primary" href={doc.url} target="_blank" rel="noreferrer">
@@ -825,23 +739,18 @@ export default function GoogleWorkspacePage({ onDiagnoseFile }) {
             <p className="muted">Choose which Google Workspace tools are active in your Punca account.</p>
             <div className="consents">
               <Toggle
-                checked={enabled.drive !== false}
-                label="Google Drive (File upload & retrieval in Diagnose)"
-                onChange={(v) => toggleService('drive', v)}
-              />
-              <Toggle
                 checked={enabled.calendar !== false}
                 label="Google Calendar (Peer group & study session scheduling)"
                 onChange={(v) => toggleService('calendar', v)}
               />
               <Toggle
                 checked={enabled.tasks !== false}
-                label="Google Tasks (Study to-do list & remediation steps)"
+                label="Study tasks (to-do list and remediation steps)"
                 onChange={(v) => toggleService('tasks', v)}
               />
               <Toggle
                 checked={enabled.chat !== false}
-                label="Google Chat (Peer study circle discussion threads)"
+                label="Circle chat (study circle discussion threads)"
                 onChange={(v) => toggleService('chat', v)}
               />
               <Toggle
@@ -858,7 +767,7 @@ export default function GoogleWorkspacePage({ onDiagnoseFile }) {
           </div>
 
           <form className="card" onSubmit={saveCustomization}>
-            <div className="eyebrow">Account &amp; Folder Customization</div>
+            <div className="eyebrow">Account</div>
             <h2 className="h2">Personal Gmail &amp; OAuth Access</h2>
             <label className="field">Connected Personal Gmail Address
               <input
@@ -868,14 +777,7 @@ export default function GoogleWorkspacePage({ onDiagnoseFile }) {
                 placeholder={data.email || 'yourname@gmail.com'}
               />
             </label>
-            <label className="field">Default Google Drive Study Folder
-              <input
-                value={folderName}
-                onChange={(e) => setFolderName(e.target.value)}
-                placeholder={prefs.driveFolderName || 'Punca Study Materials'}
-              />
-            </label>
-            <label className="field">Optional Google OAuth Access Token <small>(for live Google API sync)</small>
+            <label className="field">Temporary Google access token <small>(testers only: connects your Google account without the sign-in window)</small>
               <input
                 type="password"
                 value={oauthToken}
@@ -886,7 +788,7 @@ export default function GoogleWorkspacePage({ onDiagnoseFile }) {
             <div className="actions">
               {data.liveAvailable && (
                 <button type="button" className="btn ghost" disabled={busy} onClick={handleLiveGoogleConnect}>
-                  Sign in with Google Popup
+                  Connect Google account
                 </button>
               )}
               <button className="btn primary" disabled={busy}>

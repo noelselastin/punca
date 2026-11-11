@@ -1,11 +1,11 @@
-"""Live Google calls made with the student's own Google sign-in (Drive, Calendar + Meet, Tasks, Docs).
+"""Live Google calls made with the student's own Google sign-in (Calendar + Meet, Docs).
 
 How it works:
 1. The browser asks Google Identity Services for a short-lived OAuth access token for the
    student's personal Gmail account (the address given at sign-up is passed as the login hint).
 2. The browser sends that token to POST /api/google/connect.
 3. While the token is valid, Workspace actions in Punca are also written to the student's real
-   Google account, and the real links (Drive file, Doc, Calendar event, Meet room) are saved.
+   Google account, and the real links (Google Doc, Calendar event, Meet room) are saved.
 
 Tokens are held in memory only. They are never written to the store or the log, and they expire
 after about an hour, after which the student reconnects with one click.
@@ -24,23 +24,22 @@ from urllib import error as urlerror
 from urllib import parse as urlparse
 from urllib import request as urlrequest
 
-# drive.file only reaches files and folders that Punca itself creates in the student's Drive.
 SCOPES = [
     "openid",
     "email",
     "profile",
+    # Only files Punca itself creates: the Google Docs it saves study notes into.
     "https://www.googleapis.com/auth/drive.file",
     "https://www.googleapis.com/auth/calendar.events",
-    "https://www.googleapis.com/auth/tasks",
 ]
 
 DRIVE = "https://www.googleapis.com/drive/v3"
 DRIVE_UPLOAD = "https://www.googleapis.com/upload/drive/v3"
 CALENDAR = "https://www.googleapis.com/calendar/v3"
-TASKS = "https://tasks.googleapis.com/tasks/v1"
 USERINFO = "https://www.googleapis.com/oauth2/v3/userinfo"
 GOOGLE_DOC_MIME = "application/vnd.google-apps.document"
 FOLDER_MIME = "application/vnd.google-apps.folder"
+
 
 
 class GoogleLiveError(Exception):
@@ -154,7 +153,7 @@ class GoogleLive:
                 status,
                 "Google refused the request"
                 + (f" ({detail})" if detail else "")
-                + ". Reconnect your Google account and allow Drive, Calendar and Tasks access.",
+                + ". Reconnect your Google account and allow Calendar and Docs access.",
             )
         if status >= 400:
             detail = (data.get("error") or {}).get("message") if isinstance(data.get("error"), dict) else None
@@ -168,7 +167,7 @@ class GoogleLive:
         body = json.dumps(payload).encode("utf-8") if payload is not None else None
         return self._request(s["token"], method, url, body)
 
-    # ---- Drive ------------------------------------------------------------------------------
+    # ---- Folder for Punca's Google Docs ---------------------------------------------------
     def _folder_id(self, uid: str, name: str) -> str:
         s = self.session(uid)
         if not s:
@@ -205,13 +204,8 @@ class GoogleLive:
         url = f"{DRIVE_UPLOAD}/files?uploadType=multipart&fields=id,name,webViewLink,mimeType"
         return self._request(s["token"], "POST", url, body, f"multipart/related; boundary={boundary}")
 
-    def drive_upload(self, uid: str, name: str, content: bytes, mime_type: str, folder: str) -> dict:
-        """Upload a file into the student's Punca folder in their own Drive."""
-        metadata = {"name": name, "parents": [self._folder_id(uid, folder)]}
-        return self._multipart_upload(uid, metadata, content, mime_type or "application/octet-stream")
-
     def drive_trash(self, uid: str, file_id: str) -> None:
-        """Move a file Punca created to the Drive bin (recoverable for 30 days)."""
+        """Move a Google Doc Punca created to the Drive bin (recoverable for 30 days)."""
         self._call(uid, "PATCH", f"{DRIVE}/files/{urlparse.quote(file_id)}", {"trashed": True})
 
     # ---- Docs (created through Drive, which converts HTML into a Google Doc) -----------------
@@ -260,30 +254,3 @@ class GoogleLive:
 
     def calendar_delete(self, uid: str, event_id: str) -> None:
         self._call(uid, "DELETE", f"{CALENDAR}/calendars/primary/events/{urlparse.quote(event_id)}")
-
-    # ---- Tasks ------------------------------------------------------------------------------
-    @staticmethod
-    def _task_body(title: str | None, notes: str | None, due: str | None, completed: bool | None) -> dict:
-        body: dict = {}
-        if title is not None:
-            body["title"] = title
-        if notes is not None:
-            body["notes"] = notes
-        if due:
-            body["due"] = f"{due[:10]}T00:00:00.000Z"
-        if completed is not None:
-            body["status"] = "completed" if completed else "needsAction"
-        return body
-
-    def task_insert(self, uid: str, title: str, notes: str, due: str | None) -> dict:
-        res = self._call(uid, "POST", f"{TASKS}/lists/@default/tasks", self._task_body(title, notes, due, None))
-        return {"id": res.get("id")}
-
-    def task_patch(self, uid: str, task_id: str, title: str | None = None, notes: str | None = None,
-                   due: str | None = None, completed: bool | None = None) -> None:
-        body = self._task_body(title, notes, due, completed)
-        if body:
-            self._call(uid, "PATCH", f"{TASKS}/lists/@default/tasks/{urlparse.quote(task_id)}", body)
-
-    def task_delete(self, uid: str, task_id: str) -> None:
-        self._call(uid, "DELETE", f"{TASKS}/lists/@default/tasks/{urlparse.quote(task_id)}")

@@ -155,7 +155,7 @@ class PuncaService:
             raise ServiceError(
                 400,
                 "Use your personal Gmail address (ending in @gmail.com), not your university email. "
-                "Punca connects Google Drive, Calendar and Tasks to it.",
+                "Punca connects Google Calendar and Google Docs to it.",
             )
         if len(password) < 8 or len(password) > 128:
             raise ServiceError(400, "Use a password of at least 8 characters.")
@@ -194,6 +194,7 @@ class PuncaService:
             "consent": {
                 "joinCircles": False,
                 "shareNameWithCircle": False,
+                "shareContact": False,
                 "sharePassport": False,
             },
             "synthetic": False,
@@ -231,6 +232,55 @@ class PuncaService:
         return user
 
     def update_profile(self, user: dict, data: dict) -> dict:
+        """Update the signed-in student's own details. Only the fields present in `data` change."""
+        uid = user["uid"]
+
+        def taken(field: str, value: str) -> bool:
+            key = value.strip().casefold()
+            return any(
+                (u.get(field) or "").strip().casefold() == key
+                for u in self.store.list("users", lambda u: u["uid"] != uid)
+            )
+
+        if "name" in data:
+            name = (data["name"] or "").strip()
+            if not 2 <= len(name) <= 60:
+                raise ServiceError(400, "Enter your name (2 to 60 characters).")
+            style = user.get("passportStyle") or {}
+            if style.get("displayName") == user.get("name"):
+                style["displayName"] = name  # the passport showed the account name, so keep them in step
+            user["name"] = name
+        if "university" in data:
+            university = (data["university"] or "").strip()
+            if not 2 <= len(university) <= 120:
+                raise ServiceError(400, "Enter your university (2 to 120 characters).")
+            user["university"] = university
+        if "studentId" in data:
+            student_id = (data["studentId"] or "").strip().upper()
+            if student_id != (user.get("studentId") or ""):
+                if user.get("demoAccount"):
+                    raise ServiceError(400, "Demo accounts keep their student ID. Create your own account to use yours.")
+                if not re.fullmatch(r"[A-Z0-9][A-Z0-9._/-]{0,39}", student_id):
+                    raise ServiceError(
+                        400,
+                        "Enter a student ID of up to 40 letters or numbers. Dots, hyphens, underscores and slashes are allowed.",
+                    )
+                if taken("studentId", student_id):
+                    raise ServiceError(409, "That student ID is already registered to another account.")
+                user["studentId"] = student_id
+        if "email" in data:
+            email = (data["email"] or "").strip().lower()
+            if email != (user.get("email") or "").lower():
+                if user.get("demoAccount"):
+                    raise ServiceError(400, "Demo accounts keep their sign-in email. Create your own account to use your Gmail.")
+                if not auth.is_personal_gmail(email):
+                    raise ServiceError(400, "Use your personal Gmail address (ending in @gmail.com).")
+                if taken("email", email):
+                    raise ServiceError(409, "Another account already uses that email.")
+                ws = user.get("googleWorkspace")
+                if isinstance(ws, dict) and (ws.get("email") or "").lower() == (user.get("email") or "").lower():
+                    ws["email"] = email
+                user["email"] = email
         if "passport" in data:
             user["passportStyle"] = self._passport_style(user, data["passport"] or {})
         if "programme" in data:
@@ -253,7 +303,7 @@ class PuncaService:
                 raise ServiceError(400, "Availability must be a list of slots such as 'Tue-14'.")
             user["availability"] = sorted(set(slots), key=sched.ALL_SLOTS.index)
         if "consent" in data:
-            for k in ("joinCircles", "shareNameWithCircle", "sharePassport"):
+            for k in ("joinCircles", "shareNameWithCircle", "shareContact", "sharePassport"):
                 if k in (data["consent"] or {}):
                     user["consent"][k] = bool(data["consent"][k])
             if "sharePassport" in (data["consent"] or {}):
@@ -389,28 +439,12 @@ class PuncaService:
         doc_summary = None
         extracted_doc_text = ""
 
-        # Check if a Google Drive file or PC file upload was attached
-        drive_file_id = (file_data.get("driveFileId") or "").strip()
+        # A file uploaded from the student's PC, if any.
         file_name = (file_data.get("fileName") or "").strip()
         file_b64 = file_data.get("fileBase64")
         file_text = file_data.get("fileText")
 
-        if drive_file_id:
-            ws = gws.ensure_workspace(user)
-            dfile = next((f for f in ws.get("driveFiles", []) if f["id"] == drive_file_id), None)
-            if not dfile:
-                raise ServiceError(404, "Selected Google Drive file was not found.")
-            extracted_doc_text = dfile.get("content") or dfile.get("summary") or dfile["name"]
-            doc_summary = {
-                "source": "google-drive",
-                "fileId": dfile["id"],
-                "fileName": dfile["name"],
-                "summary": dfile.get("summary") or extracted_doc_text[:300],
-                "wordCount": len(re.findall(r"\S+", extracted_doc_text)),
-                "webViewLink": dfile.get("webViewLink"),
-                "live": bool(dfile.get("live")),
-            }
-        elif file_name or file_b64 or file_text:
+        if file_name or file_b64 or file_text:
             try:
                 parsed = gws.extract_document_text(file_name or "uploaded-brief.txt", file_b64, file_text)
             except gws.WorkspaceError as exc:
@@ -422,18 +456,6 @@ class PuncaService:
                 "summary": parsed["summary"],
                 "wordCount": parsed["wordCount"],
             }
-            if file_data.get("saveToDrive"):
-                saved, warn = self._drive_save(
-                    user,
-                    parsed,
-                    raw_bytes=gws.decode_upload(file_b64),
-                    mime_type=file_data.get("mimeType"),
-                )
-                doc_summary["driveFileId"] = saved["id"]
-                doc_summary["webViewLink"] = saved.get("webViewLink")
-                doc_summary["live"] = saved.get("live", False)
-                if warn:
-                    doc_summary["warning"] = warn
 
         combined = f"{text}\n\n{extracted_doc_text}".strip()
         if not 3 <= len(combined) <= 15000:
@@ -775,9 +797,9 @@ class PuncaService:
                 state = "entry-required"
                 summary["entryRequired"] += 1
             elif m and m["status"] in ("shaky", "solid"):
+                # Shaky, or solid but not yet stamped: both are one or two re-checks from a stamp.
                 state = m["status"]
-                if state == "shaky":
-                    summary["inProgress"] += 1
+                summary["inProgress"] += 1
             else:
                 state = "untested"
             regions[c["area"]].append({
@@ -832,7 +854,6 @@ class PuncaService:
             "live": live_now,
             "mode": "oauth-live" if live_now else "workspace",
             "enabledServices": ws.get("enabledServices", {}),
-            "driveCount": len(ws.get("driveFiles") or []),
             "calendarCount": len(ws.get("calendarEvents") or []),
             "openTasksCount": sum(1 for t in (ws.get("tasks") or []) if not t.get("completed")),
             "docsCount": len(ws.get("docs") or []),
@@ -873,43 +894,127 @@ class PuncaService:
             lambda c: c["status"] != "done" and (concept is None or c["conceptId"] == concept),
         )
 
+    def _user_gaps(self, uid: str) -> list[str]:
+        """Concepts this student still needs to close, most relevant first.
+
+        Root causes found by their diagnoses that are not yet solid come first (newest diagnosis
+        first), then any other concept whose mastery is in the gap band.
+        """
+        mastery = self.mastery_map(uid)
+        docs = sorted(
+            self.store.list(
+                "diagnoses",
+                lambda d: d["uid"] == uid and d.get("status") == "done" and d.get("rootCauseConceptId"),
+            ),
+            key=lambda d: d["createdAt"],
+            reverse=True,
+        )
+        out: list[str] = []
+        for d in docs:
+            cid = d["rootCauseConceptId"]
+            p = mastery[cid]["pKnown"] if cid in mastery else config.P_INIT
+            if p < config.SOLID and cid not in out and cid in self.cat.concepts:
+                out.append(cid)
+        for cid, m in mastery.items():
+            if m["status"] == "gap" and cid not in out and cid in self.cat.concepts:
+                out.append(cid)
+        return out
+
+    def _user_modules(self, user: dict) -> set[str]:
+        """Module ids a student is working in: their chosen focus topics plus anything they have touched."""
+        uid = user["uid"]
+        lab_module = {lab["id"]: lab.get("moduleId") for lab in self.cat.labs}
+        mods = {lab_module.get(x) for x in (user.get("passportStyle") or {}).get("focusLabIds", [])}
+        for m in self.store.list("mastery", lambda m: m["uid"] == uid):
+            mods.add((self.cat.concepts.get(m["conceptId"]) or {}).get("moduleId"))
+        for d in self.store.list("diagnoses", lambda d: d["uid"] == uid):
+            mods.add((self.cat.concepts.get(d.get("targetConceptId")) or {}).get("moduleId"))
+        mods.discard(None)
+        return mods
+
     def _eligible(self, concept: str) -> dict[str, list[str]]:
+        """Opted-in students who still have this gap and are not already in a circle for it.
+
+        Free hours are returned for matching, but an empty list no longer excludes anyone.
+        """
         in_circle = {u for c in self._active_circles(concept) for u in c["memberUids"]}
         out = {}
         for u in self.store.list("users", lambda u: u["role"] == "student"):
-            if u["uid"] in in_circle or not u["consent"].get("joinCircles") or not u["availability"]:
+            if u["uid"] in in_circle or not u["consent"].get("joinCircles"):
                 continue
-            if self._latest_root(u["uid"]) != concept:
+            if concept not in self._user_gaps(u["uid"]):
                 continue
-            if StoreMastery(self.store, u["uid"]).get(concept)[0] >= config.SOLID:
-                continue
-            out[u["uid"]] = u["availability"]
+            out[u["uid"]] = u.get("availability") or []
         return out
 
+    def _propose_members(self, concept: str, user: dict) -> dict | None:
+        """Members, and a shared free hour when one exists, for a new circle on this gap.
+
+        A shared hour is preferred but not required. With no overlap the circle is still proposed
+        and its members agree a time in the chat. Returns None when nobody else has the gap.
+        """
+        me = user["uid"]
+        avail = self._eligible(concept)
+        avail[me] = user.get("availability") or []
+        if len(avail) < 2:
+            return None
+        prop = sched.propose_circle(concept, avail, 2, config.MAX_GROUP_SIZE, must_include=me)
+        members = list(prop["memberUids"]) if prop else [me]
+        if len(members) < config.MIN_GROUP_SIZE + 1:
+            mine = set(avail[me])
+            rest = sorted(
+                (u for u in avail if u not in members),
+                # most free hours in common first; real accounts before sample peers
+                key=lambda u: (-len(mine & set(avail[u])), u.startswith("u-syn-"), u),
+            )
+            members += rest[: config.MIN_GROUP_SIZE + 1 - len(members)]
+        return {
+            "conceptId": concept,
+            "memberUids": members,
+            "proposedSlot": prop["proposedSlot"] if prop else None,
+            "mode": "peer",
+        }
+
     def circle_view(self, c: dict, viewer: dict) -> dict:
-        members = []
+        my_hours = set(viewer.get("availability") or [])
+        members, details = [], []
         for uid in c["memberUids"]:
             u = self.store.get("users", uid) or {}
-            if uid == viewer["uid"]:
-                label = "You"
-            else:
-                label = u.get("name") if u.get("consent", {}).get("shareNameWithCircle") else None
-            members.append(label or "Anonymous peer")
+            consent = u.get("consent") or {}
+            is_you = uid == viewer["uid"]
+            shows_name = bool(consent.get("shareNameWithCircle"))
+            name = "You" if is_you else (u.get("name") if shows_name else None) or "Anonymous peer"
+            members.append(name)
+            details.append({
+                "name": name,
+                "isYou": is_you,
+                "email": u.get("email") if (is_you or consent.get("shareContact")) else None,
+                "programme": u.get("programme") if (is_you or shows_name) else None,
+                # Free hours this member has in common with the person looking at the circle.
+                "sharedHours": []
+                if is_you
+                else [sched.slot_label(s) for s in (u.get("availability") or []) if s in my_hours][:3],
+            })
         tiers = [(self.store.get("stamps", f"{u}_{c['conceptId']}") or {}).get("tier") for u in c["memberUids"]]
         meet_live = bool(c.get("meetLive")) and bool(gws.clean_meet_link(c.get("meetUrl")))
         meet_url = gws.clean_meet_link(c.get("meetUrl")) if meet_live else None
         messages = list(c.get("messages") or [])
+        slot = c.get("proposedSlot")
         return {
             "id": c["id"],
             "conceptId": c["conceptId"],
             "conceptName": self.cat.name(c["conceptId"]),
+            "moduleName": (self.cat.concepts.get(c["conceptId"]) or {}).get("area"),
             "stampsCompleted": sum(1 for t in tiers if t),
             "stampsVerified": sum(1 for t in tiers if t),
             "status": c["status"],
-            "proposedSlot": c["proposedSlot"],
-            "slotLabel": sched.slot_label(c["proposedSlot"]),
+            "proposedSlot": slot,
+            "slotLabel": sched.slot_label(slot) if slot else "Time to be agreed in the chat",
+            "slotAgreed": bool(slot),
+            "viewerFreeAtSlot": bool(slot) and slot in my_hours,
             "memberCount": len(c["memberUids"]),
             "members": members,
+            "memberDetails": details,
             "mode": "peer",
             "meetUrl": meet_url,
             "meetLive": meet_live,
@@ -919,6 +1024,18 @@ class PuncaService:
             "note": c.get("note"),
             "synthetic": c.get("synthetic", False),
         }
+
+    def _open_circle_for(self, concept: str, user: dict) -> dict | None:
+        """An active circle on this gap that still has room. Circles of real accounts come first,
+        then circles that meet in one of the student's free hours."""
+        my_hours = set(user.get("availability") or [])
+        open_circles = [c for c in self._active_circles(concept) if len(c["memberUids"]) < config.MAX_GROUP_SIZE]
+        if not open_circles:
+            return None
+        return sorted(
+            open_circles,
+            key=lambda c: (bool(c.get("synthetic")), c.get("proposedSlot") not in my_hours, c.get("createdAt") or ""),
+        )[0]
 
     def circle_suggestion(self, user: dict, concept: str | None = None) -> dict:
         concept = concept or self._latest_root(user["uid"])
@@ -930,65 +1047,72 @@ class PuncaService:
         mine = [c for c in self._active_circles(concept) if user["uid"] in c["memberUids"]]
         if mine:
             return base | {"status": "member", "circle": self.circle_view(mine[0], user)}
-        if not user["availability"]:
-            return base | {"status": "need-availability"}
-        for c in self._active_circles(concept):
-            if c["proposedSlot"] in user["availability"] and len(c["memberUids"]) < config.MAX_GROUP_SIZE:
-                return base | {"status": "existing", "circle": self.circle_view(c, user)}
-        avail = self._eligible(concept)
-        avail[user["uid"]] = user["availability"]
-        prop = sched.propose_circle(
-            concept,
-            avail,
-            config.MIN_GROUP_SIZE,
-            config.MAX_GROUP_SIZE,
-            must_include=user["uid"],
-        )
+        existing = self._open_circle_for(concept, user)
+        if existing:
+            return base | {"status": "existing", "circle": self.circle_view(existing, user)}
+        prop = self._propose_members(concept, user)
         if not prop:
-            others = len(avail) - 1
             return base | {
                 "status": "not-enough",
-                "peersWithGap": others,
+                "peersWithGap": 0,
                 "message": (
-                    f"{others} other opted-in student(s) share this gap, but fewer than "
-                    f"{config.MIN_GROUP_SIZE} are free at the same hour as you. Add more free hours "
-                    "or check back later."
+                    "No other opted-in student has this gap yet. See the suggested study partners on the "
+                    "Study circles page, or check back later."
                 ),
             }
         fake = {"id": "proposal", "status": "proposal", "meetUrl": None, "meetLive": False, "messages": [], **prop}
         return base | {"status": "proposal", "circle": self.circle_view(fake, user)}
 
+    def _add_member(self, user: dict, c: dict) -> dict:
+        user["consent"]["joinCircles"] = True
+        self.store.put("users", user["uid"], user)
+        c["memberUids"].append(user["uid"])
+        c.setdefault("messages", []).append({
+            "id": "msg-" + uuid.uuid4().hex[:8],
+            "sender": "Study Circle",
+            "text": f"{user.get('name') or 'A student'} joined the circle.",
+            "createdAt": _iso(),
+        })
+        self.store.put("studyCircles", c["id"], c)
+        self._sync_circle_to_all_members(c)
+        return self.circle_view(c, user)
+
+    def join_circle_by_id(self, user: dict, circle_id: str) -> dict:
+        """Join one specific open circle (used by the open circles list)."""
+        c = self.store.get("studyCircles", circle_id)
+        if not c or c.get("status") == "done":
+            raise ServiceError(404, "Circle not found.")
+        if user["uid"] in c["memberUids"]:
+            return self.circle_view(c, user)
+        if len(c["memberUids"]) >= config.MAX_GROUP_SIZE:
+            raise ServiceError(409, "That circle is full. Pick another one.")
+        return self._add_member(user, c)
+
     def join_circle(self, user: dict, concept: str) -> dict:
         sug = self.circle_suggestion(user, concept)
         if sug["status"] == "member":
             return sug["circle"]
-        user["consent"]["joinCircles"] = True
-        self.store.put("users", user["uid"], user)
         if sug["status"] == "existing":
-            c = self.store.get("studyCircles", sug["circle"]["id"])
-            c["memberUids"].append(user["uid"])
-            self.store.put("studyCircles", c["id"], c)
-            self._sync_circle_to_workspace(user, c)
-            return self.circle_view(c, user)
+            return self._add_member(user, self.store.get("studyCircles", sug["circle"]["id"]))
         if sug["status"] != "proposal":
             raise ServiceError(409, sug.get("message") or "No circle can be formed right now.")
-        avail = self._eligible(concept)
-        avail[user["uid"]] = user["availability"]
-        prop = sched.propose_circle(
-            concept,
-            avail,
-            config.MIN_GROUP_SIZE,
-            config.MAX_GROUP_SIZE,
-            must_include=user["uid"],
-        )
+        user["consent"]["joinCircles"] = True
+        self.store.put("users", user["uid"], user)
+        prop = self._propose_members(concept, user)
         cid = "c-" + uuid.uuid4().hex[:10]
+        slot = prop["proposedSlot"]
+        when = (
+            f"Suggested time: {sched.slot_label(slot)}, a free hour you share."
+            if slot
+            else "You have no free hour in common yet, so agree a time here."
+        )
         c = {
             "id": cid,
             "courseId": self.cat.course["id"],
             "conceptId": concept,
             "memberUids": prop["memberUids"],
             "status": "scheduled",
-            "proposedSlot": prop["proposedSlot"],
+            "proposedSlot": slot,
             "mode": "peer",
             "meetUrl": None,
             "meetLive": False,
@@ -997,8 +1121,8 @@ class PuncaService:
                     "id": "msg-" + uuid.uuid4().hex[:8],
                     "sender": "Study Circle",
                     "text": (
-                        f"Peer circle created for {self.cat.name(concept)} ({sched.slot_label(prop['proposedSlot'])}). "
-                        "Start a Google Meet room and paste the link above, or discuss here!"
+                        f"Peer circle created for {self.cat.name(concept)}. {when} "
+                        "Start a Google Meet room and paste the link above, or discuss here."
                     ),
                     "createdAt": _iso(),
                 }
@@ -1006,9 +1130,80 @@ class PuncaService:
             "createdAt": _iso(),
         }
         self.store.put("studyCircles", cid, c)
-        self._sync_circle_to_workspace(user, c)
+        self._sync_circle_to_all_members(c)
         log.info("circle %s created for %s with %d members", cid, concept, len(c["memberUids"]))
         return self.circle_view(c, user)
+
+    def peer_suggestions(self, user: dict) -> dict:
+        """People to study with: every opted-in student, ranked by what they have in common with you.
+
+        Common gaps count most, then common modules, then a shared free hour. A shared hour is a
+        bonus shown on the card, never a requirement, so a brand-new account still sees suggestions.
+        """
+        me = user["uid"]
+        my_gaps = self._user_gaps(me)
+        my_mods = self._user_modules(user)
+        my_hours = set(user.get("availability") or [])
+        mod_name = {m["id"]: m["name"] for m in self.cat.modules}
+        mod_order = {m["id"]: i for i, m in enumerate(self.cat.modules)}
+
+        def named(ids: list[str]) -> list[dict]:
+            return [{"id": c, "name": self.cat.name(c)} for c in ids]
+
+        def mod_names(ids) -> list[str]:
+            return [mod_name[m] for m in sorted(ids, key=lambda m: mod_order.get(m, 99)) if m in mod_name]
+
+        my_circles = self.store.list("studyCircles", lambda c: c["status"] != "done" and me in c["memberUids"])
+        peers = []
+        for u in self.store.list(
+            "users", lambda u: u["role"] == "student" and not u.get("synthetic") and u["uid"] != me
+        ):
+            consent = u.get("consent") or {}
+            if not consent.get("joinCircles"):
+                continue
+            gaps = self._user_gaps(u["uid"])
+            mods = self._user_modules(u)
+            common_gaps = [g for g in gaps if g in my_gaps]
+            common_mods = mods & my_mods
+            shared = [s for s in (u.get("availability") or []) if s in my_hours]
+            shows_name = bool(consent.get("shareNameWithCircle"))
+            peers.append({
+                "uid": u["uid"],
+                "name": u["name"] if shows_name else "Anonymous peer",
+                "email": u.get("email") if consent.get("shareContact") else None,
+                "programme": u.get("programme") if shows_name else None,
+                "year": u.get("year") if shows_name else None,
+                "university": u.get("university") if shows_name else None,
+                "gaps": named(gaps[:4]),
+                "commonGaps": named(common_gaps[:4]),
+                "modules": mod_names(mods),
+                "commonModules": mod_names(common_mods),
+                "sharedHours": [sched.slot_label(s) for s in shared[:4]],
+                "inCircleWithYou": any(u["uid"] in c["memberUids"] for c in my_circles),
+                "score": 3 * len(common_gaps) + len(common_mods) + (1 if shared else 0),
+            })
+        peers.sort(key=lambda p: (-p["score"], p["name"]))
+
+        ranked = []
+        for c in self._active_circles():
+            if me in c["memberUids"] or len(c["memberUids"]) >= config.MAX_GROUP_SIZE:
+                continue
+            module = (self.cat.concepts.get(c["conceptId"]) or {}).get("moduleId")
+            reason = "common-gap" if c["conceptId"] in my_gaps else "common-module" if module in my_mods else None
+            ranked.append(({"common-gap": 0, "common-module": 1}.get(reason, 2), bool(c.get("synthetic")), c, reason))
+        ranked.sort(key=lambda t: (t[0], t[1], t[2].get("createdAt") or ""))
+        consent = user.get("consent") or {}
+        return {
+            "me": {
+                "gaps": named(my_gaps[:6]),
+                "modules": mod_names(my_mods),
+                "optedIn": bool(consent.get("joinCircles")),
+                "showsName": bool(consent.get("shareNameWithCircle")),
+                "sharesContact": bool(consent.get("shareContact")),
+            },
+            "peers": peers[:12],
+            "openCircles": [dict(self.circle_view(c, user), reason=reason) for _, _, c, reason in ranked[:6]],
+        }
 
     def _sync_circle_to_workspace(self, user: dict, circle: dict) -> None:
         ws = gws.ensure_workspace(user)
@@ -1098,18 +1293,29 @@ class PuncaService:
         return self.circle_view(c, user)
 
     @staticmethod
-    def _next_slot_start(slot: str) -> datetime:
-        """Next occurrence of a weekday-hour slot like 'Tue-14' in UTC+8 (or tomorrow at that hour)."""
-        now = _now()
+    def _local_tz():
+        """The campus time zone (PUNCA_TIMEZONE). Falls back to UTC+8 when tz data is not installed."""
+        try:
+            from zoneinfo import ZoneInfo
+
+            return ZoneInfo(config.PUNCA_TIMEZONE)
+        except Exception:
+            return timezone(timedelta(hours=8))
+
+    @classmethod
+    def _next_slot_start(cls, slot: str | None) -> datetime:
+        """Next occurrence of a weekly slot such as 'Tue-14', in campus local time.
+
+        A circle with no agreed slot gets tomorrow at the next full hour as a placeholder.
+        """
+        now = datetime.now(cls._local_tz())
         day_map = {"Mon": 0, "Tue": 1, "Wed": 2, "Thu": 3, "Fri": 4, "Sat": 5, "Sun": 6}
         try:
             d_str, h_str = (slot or "").split("-")
-            target_wd = day_map.get(d_str, (now.weekday() + 1) % 7)
-            hour = int(h_str)
-            days_ahead = (target_wd - now.weekday()) % 7 or 7
-            return (now + timedelta(days=days_ahead)).replace(hour=hour, minute=0, second=0, microsecond=0)
-        except Exception:
-            return (now + timedelta(days=1)).replace(minute=0, second=0, microsecond=0)
+            days_ahead = (day_map[d_str] - now.weekday()) % 7 or 7
+            return (now + timedelta(days=days_ahead)).replace(hour=int(h_str), minute=0, second=0, microsecond=0)
+        except (ValueError, KeyError):
+            return (now + timedelta(days=1, hours=1)).replace(minute=0, second=0, microsecond=0)
 
     def circle_schedule_calendar(self, user: dict, circle_id: str) -> dict:
         c = self.store.get("studyCircles", circle_id)
@@ -1117,7 +1323,7 @@ class PuncaService:
             raise ServiceError(404, "Circle not found.")
         ws = gws.ensure_workspace(user)
         concept_name = self.cat.name(c["conceptId"])
-        slot_lbl = sched.slot_label(c["proposedSlot"])
+        slot_lbl = sched.slot_label(c["proposedSlot"]) if c.get("proposedSlot") else "time to be agreed"
         start_dt = self._next_slot_start(c["proposedSlot"])
         start_iso = _iso(start_dt)
         end_iso = _iso(start_dt + timedelta(hours=1))
@@ -1161,46 +1367,6 @@ class PuncaService:
             log.warning("live Google call failed: %s", exc.message)
             return None, exc.message
 
-    def _drive_save(
-        self,
-        user: dict,
-        parsed: dict,
-        raw_bytes: bytes | None = None,
-        mime_type: str | None = None,
-        folder: str | None = None,
-    ) -> tuple[dict, str | None]:
-        ws = gws.ensure_workspace(user)
-        try:
-            gws._require_service(ws, "drive")
-        except gws.WorkspaceError as exc:
-            raise ServiceError(exc.status, exc.message) from exc
-        folder_name = (folder or ws["preferences"].get("driveFolderName") or "Punca Study Materials").strip()
-        mime = (mime_type or "").strip() or gws.guess_mime(parsed["filename"])
-        payload_bytes = raw_bytes if raw_bytes is not None else parsed["text"].encode("utf-8")
-        warning = None
-        live_res = None
-        if self._is_live(user):
-            live_res, warning = self._mirror(
-                lambda: self.live.drive_upload(user["uid"], parsed["filename"], payload_bytes, mime, folder_name)
-            )
-        item = {
-            "id": "gdrive-" + uuid.uuid4().hex[:8],
-            "googleId": (live_res or {}).get("id"),
-            "name": parsed["filename"],
-            "mimeType": mime,
-            "folder": folder_name,
-            "sizeBytes": len(payload_bytes),
-            "updatedAt": _iso(),
-            "webViewLink": (live_res or {}).get("webViewLink"),
-            "live": bool(live_res),
-            "starter": False,
-            "summary": parsed["summary"],
-            "content": parsed["text"][:10000],
-        }
-        ws["driveFiles"].insert(0, item)
-        self.store.put("users", user["uid"], user)
-        return item, warning
-
     def google_connect(self, user: dict, access_token: str, expires_in: int | None = None) -> dict:
         ws = gws.ensure_workspace(user)
         try:
@@ -1232,6 +1398,17 @@ class PuncaService:
         live_session = self.live.session(user["uid"]) if self.live else None
         if not live_session and ws.get("mode") == "oauth-live":
             ws["mode"] = "workspace"
+        # Every session gets an "Add to Google Calendar" link, including ones saved before the
+        # link existed.
+        for ev in ws.get("calendarEvents") or []:
+            if not ev.get("calendarLink") and ev.get("title") and ev.get("startTime"):
+                ev["calendarLink"] = gws.calendar_template_link(
+                    ev["title"],
+                    ev.get("description") or "",
+                    ev["startTime"],
+                    ev.get("endTime") or gws.one_hour_after(ev["startTime"]),
+                    config.PUNCA_TIMEZONE,
+                )
         self.store.put("users", user["uid"], user)
         return {
             "connected": bool(ws.get("connected", True)),
@@ -1247,7 +1424,6 @@ class PuncaService:
             "connectedAt": ws.get("connectedAt"),
             "enabledServices": ws.get("enabledServices", {}),
             "preferences": ws.get("preferences", {}),
-            "driveFiles": ws.get("driveFiles", []),
             "calendarEvents": ws.get("calendarEvents", []),
             "tasks": ws.get("tasks", []),
             "docs": ws.get("docs", []),
@@ -1270,40 +1446,16 @@ class PuncaService:
                 if k in data["enabledServices"]:
                     ws["enabledServices"][k] = bool(data["enabledServices"][k])
         if isinstance(data.get("preferences"), dict):
-            for k in ("driveFolderName", "defaultReminderMinutes", "autoCreateMeetForCircles", "autoSyncTasksFromDiagnosis"):
+            for k in ("defaultReminderMinutes", "autoCreateMeetForCircles", "autoSyncTasksFromDiagnosis"):
                 if k in data["preferences"] and data["preferences"][k] is not None:
                     ws["preferences"][k] = data["preferences"][k]
         user["googleWorkspace"] = ws
         self.store.put("users", user["uid"], user)
         return self.google_status(user)
 
-    def google_drive_upload(self, user: dict, data: dict) -> dict:
-        try:
-            parsed = gws.extract_document_text(
-                filename=data.get("fileName") or data.get("title") or "study-file.txt",
-                content_base64=data.get("fileBase64"),
-                text=data.get("fileText"),
-            )
-        except gws.WorkspaceError as exc:
-            raise ServiceError(exc.status, exc.message) from exc
-        raw_bytes = gws.decode_upload(data.get("fileBase64"))
-        item, warning = self._drive_save(
-            user,
-            parsed,
-            raw_bytes=raw_bytes,
-            mime_type=data.get("mimeType"),
-            folder=data.get("folder"),
-        )
-        return {"file": item, "warning": warning, "workspace": self.google_status(user)}
-
-    def google_drive_delete(self, user: dict, file_id: str) -> dict:
-        ws = gws.ensure_workspace(user)
-        target = next((f for f in ws.get("driveFiles", []) if f["id"] == file_id), None)
-        if target and target.get("live") and target.get("googleId") and self._is_live(user):
-            self._mirror(lambda: self.live.drive_trash(user["uid"], target["googleId"]))
-        ws["driveFiles"] = [f for f in ws.get("driveFiles", []) if f["id"] != file_id]
-        self.store.put("users", user["uid"], user)
-        return self.google_status(user)
+    def _require_live(self, user: dict, what: str) -> None:
+        if not self._is_live(user):
+            raise ServiceError(409, f"Connect your Google account to {what}.")
 
     def google_calendar_create(self, user: dict, data: dict) -> dict:
         ws = gws.ensure_workspace(user)
@@ -1391,26 +1543,20 @@ class PuncaService:
             raise ServiceError(400, "Enter a task title.")
         notes = (data.get("notes") or "").strip()[:600]
         due = (data.get("due") or (_now() + timedelta(days=2)).date().isoformat())[:10]
-        warning = None
-        live_res = None
-        if self._is_live(user):
-            live_res, warning = self._mirror(lambda: self.live.task_insert(user["uid"], title[:200], notes, due))
         task = {
             "id": "gtask-" + uuid.uuid4().hex[:8],
-            "googleId": (live_res or {}).get("id"),
             "title": title[:200],
             "notes": notes,
             "due": due,
             "completed": False,
             "completedAt": None,
-            "live": bool(live_res),
             "conceptId": data.get("conceptId"),
             "diagnosisId": data.get("diagnosisId"),
             "createdAt": _iso(),
         }
         ws["tasks"].insert(0, task)
         self.store.put("users", user["uid"], user)
-        return {"task": task, "warning": warning, "workspace": self.google_status(user)}
+        return {"task": task, "workspace": self.google_status(user)}
 
     def google_tasks_update(self, user: dict, task_id: str, data: dict) -> dict:
         ws = gws.ensure_workspace(user)
@@ -1426,26 +1572,40 @@ class PuncaService:
             target["notes"] = data["notes"].strip()[:600]
         if "due" in data and data["due"] is not None:
             target["due"] = data["due"][:10]
-        warning = None
-        if target.get("live") and target.get("googleId") and self._is_live(user):
-            _, warning = self._mirror(
-                lambda: self.live.task_patch(
-                    user["uid"],
-                    target["googleId"],
-                    title=target["title"],
-                    notes=target.get("notes"),
-                    due=target.get("due"),
-                    completed=target["completed"],
+        self.store.put("users", user["uid"], user)
+        return {"task": target, "workspace": self.google_status(user)}
+
+    def google_calendar_sync(self, user: dict, event_id: str) -> dict:
+        """Put a session that only exists in Punca into the student's real Google Calendar."""
+        ws = gws.ensure_workspace(user)
+        ev = next((e for e in ws.get("calendarEvents") or [] if e["id"] == event_id), None)
+        if not ev:
+            raise ServiceError(404, "Session not found.")
+        self._require_live(user, "add sessions straight to Google Calendar")
+        if not (ev.get("live") and ev.get("googleId")):
+            own = (ws.get("email") or user.get("email") or "").lower()
+            guests = [a for a in ev.get("attendees") or [] if auth.valid_email(a) and a.lower() != own]
+            end = ev.get("endTime") or gws.one_hour_after(ev["startTime"])
+            wants_meet = not ev.get("meetUrl")
+            description = ev.get("description") or ""
+            if ev.get("meetUrl") and ev["meetUrl"] not in description:
+                description = f"{description} Meet room: {ev['meetUrl']}".strip()
+            res, warning = self._mirror(
+                lambda: self.live.calendar_insert(
+                    user["uid"], ev["title"], description, ev["startTime"], end, config.PUNCA_TIMEZONE,
+                    guests, wants_meet, ws.get("preferences", {}).get("defaultReminderMinutes", 30),
                 )
             )
-        self.store.put("users", user["uid"], user)
-        return {"task": target, "warning": warning, "workspace": self.google_status(user)}
+            if not res or not res.get("id"):
+                raise ServiceError(502, warning or "Google Calendar did not accept the session.")
+            ev.update(googleId=res["id"], live=True, calendarLink=res.get("htmlLink") or ev.get("calendarLink"))
+            if res.get("meetUrl") and not ev.get("meetUrl"):
+                ev.update(meetUrl=res["meetUrl"], meetLive=True)
+            self.store.put("users", user["uid"], user)
+        return {"event": ev, "workspace": self.google_status(user)}
 
     def google_tasks_delete(self, user: dict, task_id: str) -> dict:
         ws = gws.ensure_workspace(user)
-        target = next((t for t in ws.get("tasks", []) if t["id"] == task_id), None)
-        if target and target.get("live") and target.get("googleId") and self._is_live(user):
-            self._mirror(lambda: self.live.task_delete(user["uid"], target["googleId"]))
         ws["tasks"] = [t for t in ws.get("tasks", []) if t["id"] != task_id]
         self.store.put("users", user["uid"], user)
         return self.google_status(user)
@@ -1459,25 +1619,18 @@ class PuncaService:
             raise ServiceError(exc.status, exc.message) from exc
         path = doc.get("path") or [doc["targetConceptId"]]
         created: list[dict] = []
-        warning = None
         for idx, cid in enumerate(path):
             cname = self.cat.name(cid)
             title = f"Step {idx + 1}: Review & pass re-check for {cname}"
             notes = f"From diagnosis on {self.cat.name(doc['targetConceptId'])}. Complete your Passport stamp for {cname}."
             due = (_now() + timedelta(days=idx + 1)).date().isoformat()
-            live_res = None
-            if self._is_live(user):
-                live_res, warn = self._mirror(lambda t=title, n=notes, d=due: self.live.task_insert(user["uid"], t, n, d))
-                warning = warning or warn
             task = {
                 "id": "gtask-" + uuid.uuid4().hex[:8],
-                "googleId": (live_res or {}).get("id"),
                 "title": title,
                 "notes": notes,
                 "due": due,
                 "completed": False,
                 "completedAt": None,
-                "live": bool(live_res),
                 "conceptId": cid,
                 "diagnosisId": did,
                 "createdAt": _iso(),
@@ -1485,7 +1638,7 @@ class PuncaService:
             ws["tasks"].insert(0, task)
             created.append(task)
         self.store.put("users", user["uid"], user)
-        return {"created": created, "warning": warning, "workspace": self.google_status(user)}
+        return {"created": created, "workspace": self.google_status(user)}
 
     def google_docs_create(self, user: dict, data: dict) -> dict:
         ws = gws.ensure_workspace(user)
@@ -1497,7 +1650,7 @@ class PuncaService:
         if not title:
             raise ServiceError(400, "Enter a title for the Google Doc.")
         content = (data.get("content") or "").strip()[:20000]
-        folder = (ws["preferences"].get("driveFolderName") or "Punca Study Materials").strip()
+        folder = gws.DOCS_FOLDER
         warning = None
         live_res = None
         if self._is_live(user):
@@ -1572,7 +1725,7 @@ class PuncaService:
             f"## Key Takeaways\n{points}\n"
         )
         title = f"Punca Notes · {root_name} → {target_name}"
-        folder = (ws["preferences"].get("driveFolderName") or "Punca Study Materials").strip()
+        folder = gws.DOCS_FOLDER
         warning = None
         live_res = None
         if self._is_live(user):
