@@ -1,0 +1,15 @@
+# Never send local data or secrets into the image.
+.git
+.env
+.env.*
+logs
+backend/var
+docs
+infra
+TASKS.md
+**/node_modules
+**/dist
+**/__pycache__
+**/.venv
+**/.pytest_cache
+.claude
