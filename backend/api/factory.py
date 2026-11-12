@@ -212,7 +212,8 @@ def create_app(store_path: Path | None = None, offline: bool | None = None) -> F
         return user
 
     # ---- public ------------------------------------------------------------------------------
-    @app.get("/api/health")
+    # HEAD too: free uptime monitors check with HEAD, and their visits keep the free host awake.
+    @app.api_route("/api/health", methods=["GET", "HEAD"])
     def health():
         return {
             "ok": True,
